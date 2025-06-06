@@ -68,8 +68,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Konfigurasi untuk shared hosting
-const port = process.env.PORT || 6001;
-const host = process.env.HOST || '192.168.1.106';
+const port = process.env.PORT || 8001;
+const host = process.env.HOST || '0.0.0.0';
 
 // Setup server dan socket.io
 const server = require("http").createServer(app);
