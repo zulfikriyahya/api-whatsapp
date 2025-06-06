@@ -139,7 +139,7 @@ app.get("/scan", (req, res) => {
 
 // Route untuk halaman utama
 app.get("/", (req, res) => {
-    res.sendFile("./client/server.html", {
+    res.sendFile("./client/index.html", {
         root: __dirname,
     });
 });
