@@ -68,8 +68,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Konfigurasi untuk shared hosting
-const port = process.env.PORT || 8001;
-const host = process.env.HOST || '0.0.0.0';
+const port = process.env.PORT || 6001;
+const host = process.env.HOST || '192.168.1.106';
 
 // Setup server dan socket.io
 const server = require("http").createServer(app);
@@ -139,7 +139,7 @@ app.get("/scan", (req, res) => {
 
 // Route untuk halaman utama
 app.get("/", (req, res) => {
-    res.sendFile("./client/index.html", {
+    res.sendFile("./client/server.html", {
         root: __dirname,
     });
 });
