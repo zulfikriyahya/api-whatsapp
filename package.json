@@ -1,17 +1,15 @@
 {
-  "name": "bot_wa",
-  "version": "1.0.0",
-  "description": "whatsapp bot sederhana",
+  "name": "api-whatsapp",
+  "version": "6.3.1",
+  "description": "API Whatsapp",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "HOST=192.168.1.106 PORT=6001 node index.js",
-    "dev": "HOST=192.168.1.106 PORT=6001 nodemon index.js"
+    "start": "HOST=192.168.1.106 PORT=6001 node index.js"
   },
   "keywords": [
     "whatsapp"
   ],
-  "author": "brekertabumi@gmail.com",
+  "author": "zulfikriyahya@zedlabs.id",
   "license": "ISC",
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
