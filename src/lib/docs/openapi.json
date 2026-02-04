@@ -1,0 +1,62 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "WhatsApp Dashboard API",
+    "version": "1.0.0",
+    "description": "API documentation for WhatsApp Dashboard Multi-Device"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Local server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    }
+  },
+  "paths": {
+    "/messages/send": {
+      "post": {
+        "summary": "Send a message",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceId": { "type": "string", "format": "uuid" },
+                  "toNumber": { "type": "string" },
+                  "message": { "type": "string" }
+                },
+                "required": ["deviceId", "toNumber", "message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message queued"
+          }
+        }
+      }
+    },
+    "/devices": {
+      "get": {
+        "summary": "List devices",
+        "responses": {
+          "200": {
+            "description": "List of devices"
+          }
+        }
+      }
+    }
+  }
+}

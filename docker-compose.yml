@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    container_name: wa-dashboard-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MARIADB_HOST=db
+      - MARIADB_USER=root
+      - MARIADB_PASSWORD=rootpassword
+      - MARIADB_DATABASE=whatsapp_db
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=rahasia_super_aman_ganti_ini_ya_32_chars
+      # Tambahkan kredensial Google OAuth Anda di file .env lokal
+    volumes:
+      - ./sessions:/app/sessions # Persist session WA agar tidak scan QR ulang saat restart
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      - db
+
+  # Worker terpisah untuk Queue Processor (Opsional, tapi disarankan untuk beban tinggi)
+  # Jika beban rendah, queue bisa jalan di dalam container 'app'
+  queue-worker:
+    build: .
+    container_name: wa-dashboard-worker
+    command: npm run queue:start
+    restart: always
+    environment:
+      - MARIADB_HOST=db
+      - MARIADB_USER=root
+      - MARIADB_PASSWORD=rootpassword
+      - MARIADB_DATABASE=whatsapp_db
+      - WHATSAPP_SESSION_PATH=/app/sessions
+    volumes:
+      - ./sessions:/app/sessions
+      - ./logs:/app/logs
+    depends_on:
+      - db
+      - app
+
+  db:
+    image: mariadb:10.6
+    container_name: wa-dashboard-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: whatsapp_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:
