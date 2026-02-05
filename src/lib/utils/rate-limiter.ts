@@ -1,12 +1,19 @@
 import { queryOne } from "@/lib/db";
 import { appConfig } from "@/config/app.config";
 
+interface RateLimitConfig {
+  perMinute?: number;
+  perHour?: number;
+}
+
 export class RateLimiter {
   static async checkLimit(
     deviceId: string,
-    perMinute: number = appConfig.rateLimit.perMinute,
-    perHour: number = appConfig.rateLimit.perHour,
+    config?: RateLimitConfig,
   ): Promise<{ allowed: boolean; reason?: string }> {
+    const perMinute = config?.perMinute || appConfig.rateLimit.perMinute;
+    const perHour = config?.perHour || appConfig.rateLimit.perHour;
+
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const oneHourAgo = new Date(now.getTime() - 3600000);
@@ -18,7 +25,7 @@ export class RateLimiter {
       [deviceId, oneMinuteAgo],
     );
 
-    if (minuteCount.count >= perMinute) {
+    if (minuteCount && minuteCount.count >= perMinute) {
       return {
         allowed: false,
         reason: `Rate limit exceeded: Max ${perMinute} messages per minute`,
@@ -32,7 +39,7 @@ export class RateLimiter {
       [deviceId, oneHourAgo],
     );
 
-    if (hourCount.count >= perHour) {
+    if (hourCount && hourCount.count >= perHour) {
       return {
         allowed: false,
         reason: `Rate limit exceeded: Max ${perHour} messages per hour`,
@@ -42,7 +49,29 @@ export class RateLimiter {
     return { allowed: true };
   }
 
-  static async recordLimit(_deviceId: string): Promise<void> {
-    // Placeholder for future implementation (e.g. Redis counter)
+  static async getUsage(deviceId: string): Promise<{
+    lastMinute: number;
+    lastHour: number;
+  }> {
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60000);
+    const oneHourAgo = new Date(now.getTime() - 3600000);
+
+    const minuteCount: any = await queryOne(
+      `SELECT COUNT(*) as count FROM messages
+       WHERE device_id = ? AND created_at >= ?`,
+      [deviceId, oneMinuteAgo],
+    );
+
+    const hourCount: any = await queryOne(
+      `SELECT COUNT(*) as count FROM messages
+       WHERE device_id = ? AND created_at >= ?`,
+      [deviceId, oneHourAgo],
+    );
+
+    return {
+      lastMinute: minuteCount?.count || 0,
+      lastHour: hourCount?.count || 0,
+    };
   }
 }

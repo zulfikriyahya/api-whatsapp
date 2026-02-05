@@ -168,3 +168,27 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX IF NOT EXISTS idx_messages_device_status_created 
+  ON messages(device_id, status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_message_queue_priority_status 
+  ON message_queue(priority DESC, status, scheduled_at);
+
+CREATE INDEX IF NOT EXISTS idx_messages_user_created 
+  ON messages(user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_devices_user_status 
+  ON devices(user_id, status, is_ready);
+
+CREATE INDEX IF NOT EXISTS idx_contacts_user_phone 
+  ON contacts(user_id, phone_number);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_active 
+  ON api_keys(user_id, is_active);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_created 
+  ON audit_logs(user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_webhooks_user_active 
+  ON webhooks(user_id, is_active);

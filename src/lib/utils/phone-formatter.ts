@@ -1,7 +1,4 @@
 export class PhoneFormatter {
-  /**
-   * Formats a phone number for WhatsApp ID (e.g., 62812345678@c.us)
-   */
   static formatForWhatsApp(
     phoneNumber: string,
     countryCode: string = "62",
@@ -14,6 +11,8 @@ export class PhoneFormatter {
       formatted = countryCode + formatted;
     }
 
+    formatted = formatted.slice(0, 15);
+
     if (!formatted.endsWith("@c.us")) {
       formatted = `${formatted}@c.us`;
     }
@@ -21,24 +20,15 @@ export class PhoneFormatter {
     return formatted;
   }
 
-  /**
-   * Validates minimal length for phone number
-   */
   static validate(phoneNumber: string): boolean {
     const cleaned = phoneNumber.replace(/\D/g, "");
     return cleaned.length >= 10 && cleaned.length <= 15;
   }
 
-  /**
-   * Removes non-numeric characters
-   */
   static normalize(phoneNumber: string): string {
-    return phoneNumber.replace(/\D/g, "");
+    return phoneNumber.replace(/\D/g, "").slice(0, 15);
   }
 
-  /**
-   * Display format (International or Local)
-   */
   static format(
     phoneNumber: string,
     format: "international" | "local" = "international",
@@ -57,5 +47,9 @@ export class PhoneFormatter {
     }
 
     return cleaned.startsWith("0") ? cleaned : `0${cleaned}`;
+  }
+
+  static sanitize(phoneNumber: string): string {
+    return this.normalize(phoneNumber);
   }
 }

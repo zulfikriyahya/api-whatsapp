@@ -23,6 +23,7 @@ class MessageQueue {
   private readonly maxConcurrent = 3;
   private readonly retryDelay = parseInt(process.env.RETRY_DELAY_MS || "5000");
   private readonly maxRetries = parseInt(process.env.MAX_RETRY_ATTEMPTS || "3");
+  private readonly maxQueueSize = 10000;
 
   constructor() {
     this.loadPendingMessages();
@@ -33,7 +34,8 @@ class MessageQueue {
   async loadPendingMessages() {
     try {
       const pending: any[] = await query(
-        `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC`,
+        `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC LIMIT ?`,
+        [this.maxQueueSize],
       );
       for (const item of pending) {
         this.queue.push({
@@ -67,6 +69,10 @@ class MessageQueue {
     priority: number = 0,
     scheduledAt: Date = new Date(),
   ) {
+    if (this.queue.length >= this.maxQueueSize) {
+      throw new Error("Queue is full");
+    }
+
     const queueId = uuidv4();
     await query(
       `INSERT INTO message_queue (id, message_id, device_id, priority, scheduled_at, status) VALUES (?, ?, ?, ?, ?, 'PENDING')`,
@@ -190,22 +196,6 @@ class MessageQueue {
 
   private async removeFromQueue(queueId: string) {
     this.queue = this.queue.filter((item) => item.id !== queueId);
-  }
-
-  async loadPendingMessages() {
-    const pending: any[] = await query(
-      `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC`,
-    );
-    for (const item of pending) {
-      this.queue.push({
-        id: item.id,
-        messageId: item.message_id,
-        deviceId: item.device_id,
-        priority: item.priority,
-        scheduledAt: new Date(item.scheduled_at),
-        retries: 0,
-      });
-    }
   }
 
   getStatus() {

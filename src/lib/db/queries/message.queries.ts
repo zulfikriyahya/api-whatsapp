@@ -212,4 +212,44 @@ export class MessageQueries {
       [deviceId, params.limit],
     );
   }
+
+  static async bulkCreate(messages: CreateMessageDTO[]): Promise<Message[]> {
+    if (messages.length === 0) return [];
+
+    const values: any[] = [];
+    const placeholders: string[] = [];
+
+    for (const data of messages) {
+      const id = uuidv4();
+      placeholders.push("(?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)");
+      values.push(
+        id,
+        data.device_id,
+        data.user_id,
+        data.to_number,
+        data.message || "",
+        data.media_path || null,
+        data.media_type || null,
+      );
+    }
+
+    const sql = `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count) VALUES ${placeholders.join(", ")}`;
+    await query(sql, values);
+
+    return query<Message[]>(
+      `SELECT * FROM messages WHERE id IN (${values
+        .filter((_, i) => i % 8 === 0)
+        .map(() => "?")
+        .join(",")})`,
+      values.filter((_, i) => i % 8 === 0),
+    );
+  }
+
+  static async deleteOldMessages(days: number = 30): Promise<number> {
+    const result: any = await query(
+      `DELETE FROM messages WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`,
+      [days],
+    );
+    return result.affectedRows || 0;
+  }
 }

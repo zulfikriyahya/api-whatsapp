@@ -9,7 +9,10 @@ export const phoneNumberSchema = z
     if (cleaned.startsWith("0")) {
       cleaned = "62" + cleaned.substring(1);
     }
-    return cleaned;
+    if (!cleaned.startsWith("62")) {
+      cleaned = "62" + cleaned;
+    }
+    return cleaned.slice(0, 15);
   });
 
 export const createDeviceSchema = z.object({
@@ -34,7 +37,8 @@ export const sendBulkMessageSchema = z.object({
         name: z.string().optional(),
       }),
     )
-    .min(1, "Minimal 1 kontak tujuan"),
+    .min(1, "Minimal 1 kontak tujuan")
+    .max(1000, "Maksimal 1000 kontak per batch"),
   useRoundRobin: z.boolean().default(true),
 });
 
@@ -75,10 +79,10 @@ export const updateWebhookSchema = z.object({
 export function validate<T>(schema: z.ZodSchema<T>, data: unknown) {
   const result = schema.safeParse(data);
   if (result.success) {
-    return { success: true, data: result.data };
+    return { success: true as const, data: result.data };
   }
   return {
-    success: false,
+    success: false as const,
     errors: result.error.errors.map((e) => ({
       field: e.path.join("."),
       message: e.message,

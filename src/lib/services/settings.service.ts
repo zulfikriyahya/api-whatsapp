@@ -9,7 +9,7 @@ export interface SystemSettings {
   retryDelayMs: number;
   sessionTimeout: number;
   autoBackupEnabled: boolean;
-  autoBackupInterval: number; // in seconds
+  autoBackupInterval: number;
 }
 
 export class SettingsService {
@@ -19,9 +19,9 @@ export class SettingsService {
     maxDevicesPerUser: 10,
     maxRetryAttempts: 3,
     retryDelayMs: 5000,
-    sessionTimeout: 2592000, // 30 days
+    sessionTimeout: 2592000,
     autoBackupEnabled: false,
-    autoBackupInterval: 86400, // 24 hours
+    autoBackupInterval: 86400,
   };
 
   static async getSystemSettings(): Promise<SystemSettings> {
@@ -104,6 +104,54 @@ export class SettingsService {
       await query(
         "INSERT INTO settings (id, user_id, setting_key, setting_value) VALUES (?, ?, 'user_preferences', ?)",
         [id, userId, JSON.stringify(updated)],
+      );
+    }
+  }
+
+  static async deleteUserSettings(userId: string): Promise<void> {
+    await query(
+      "DELETE FROM settings WHERE user_id = ? AND setting_key = 'user_preferences'",
+      [userId],
+    );
+  }
+
+  static async getSetting(key: string, userId?: string): Promise<any | null> {
+    const settings: any = await queryOne(
+      "SELECT setting_value FROM settings WHERE setting_key = ? AND user_id = ?",
+      [key, userId || null],
+    );
+
+    if (!settings) return null;
+
+    try {
+      return JSON.parse(settings.setting_value);
+    } catch {
+      return settings.setting_value;
+    }
+  }
+
+  static async setSetting(
+    key: string,
+    value: any,
+    userId?: string,
+  ): Promise<void> {
+    const existing: any = await queryOne(
+      "SELECT id FROM settings WHERE setting_key = ? AND user_id = ?",
+      [key, userId || null],
+    );
+
+    const jsonValue = JSON.stringify(value);
+
+    if (existing) {
+      await query(
+        "UPDATE settings SET setting_value = ?, updated_at = NOW() WHERE id = ?",
+        [jsonValue, existing.id],
+      );
+    } else {
+      const id = uuidv4();
+      await query(
+        "INSERT INTO settings (id, user_id, setting_key, setting_value) VALUES (?, ?, ?, ?)",
+        [id, userId || null, key, jsonValue],
       );
     }
   }

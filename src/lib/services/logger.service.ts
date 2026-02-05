@@ -1,7 +1,14 @@
 import winston from "winston";
 import { appConfig } from "@/config/app.config";
+import * as fs from "fs";
+import * as path from "path";
 
-const { combine, timestamp, json, colorize, printf } = winston.format;
+const logsDir = path.join(process.cwd(), "logs");
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const { combine, timestamp, json, colorize, printf, errors } = winston.format;
 
 const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
   let msg = `${timestamp} [${level}]: ${message}`;
@@ -13,13 +20,19 @@ const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
 
 export const logger = winston.createLogger({
   level: appConfig.isDevelopment ? "debug" : "info",
-  format: combine(timestamp(), json()),
+  format: combine(errors({ stack: true }), timestamp(), json()),
   transports: [
     new winston.transports.File({
-      filename: "logs/error.log",
+      filename: path.join(logsDir, "error.log"),
       level: "error",
+      maxsize: 5242880,
+      maxFiles: 5,
     }),
-    new winston.transports.File({ filename: "logs/combined.log" }),
+    new winston.transports.File({
+      filename: path.join(logsDir, "combined.log"),
+      maxsize: 5242880,
+      maxFiles: 5,
+    }),
   ],
 });
 
@@ -40,4 +53,16 @@ export const logError = (error: unknown, context?: string) => {
   } else {
     logger.error(String(error), { context });
   }
+};
+
+export const logInfo = (message: string, meta?: Record<string, any>) => {
+  logger.info(message, meta);
+};
+
+export const logWarning = (message: string, meta?: Record<string, any>) => {
+  logger.warn(message, meta);
+};
+
+export const logDebug = (message: string, meta?: Record<string, any>) => {
+  logger.debug(message, meta);
 };

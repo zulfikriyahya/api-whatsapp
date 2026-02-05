@@ -1,6 +1,7 @@
 import { query, queryOne } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
+import { logError, logInfo } from "./logger.service";
 
 interface Webhook {
   id: string;
@@ -116,7 +117,7 @@ export class WebhookService {
       this.sendWebhookRequest(webhook, event, payload),
     );
 
-    Promise.allSettled(promises);
+    await Promise.allSettled(promises);
   }
 
   private static async sendWebhookRequest(
@@ -124,6 +125,7 @@ export class WebhookService {
     event: string,
     payload: Record<string, any>,
   ): Promise<void> {
+    const webhookId = webhook.id.substring(0, 8);
     try {
       const timestamp = new Date().toISOString();
       const bodyData = {
@@ -161,13 +163,29 @@ export class WebhookService {
 
       clearTimeout(timeout);
 
-      if (!response.ok) {
-        console.warn(
-          `Webhook ${webhook.id} failed with status ${response.status}`,
+      if (response.ok) {
+        logInfo(`Webhook delivered successfully`, {
+          webhookId,
+          event,
+          status: response.status,
+        });
+      } else {
+        logError(
+          new Error(
+            `Webhook failed with status ${response.status}: ${await response.text()}`,
+          ),
+          `webhook-${webhookId}`,
         );
       }
-    } catch (error) {
-      console.error(`Webhook error for ${webhook.url}:`, error);
+    } catch (error: any) {
+      logError(error, `webhook-${webhookId}`);
     }
+  }
+
+  static async getWebhookLogs(
+    webhookId: string,
+    limit: number = 50,
+  ): Promise<any[]> {
+    return [];
   }
 }

@@ -22,15 +22,18 @@ export class BackupService {
     const filename = `backup_${timestamp}.sql`;
     const filepath = path.join(this.backupsDir, filename);
 
-    const command = `mysqldump -h ${appConfig.database.host} -P ${appConfig.database.port} -u ${appConfig.database.user} -p${appConfig.database.password} ${appConfig.database.database} > ${filepath}`;
+    const configFile = this.createMyCnfFile();
 
     try {
+      const command = `mysqldump --defaults-extra-file=${configFile} ${appConfig.database.database} > ${filepath}`;
       await execAsync(command);
       console.log(`Backup created: ${filepath}`);
       return filepath;
     } catch (error) {
       console.error("Backup failed:", error);
       throw new Error("Failed to create backup");
+    } finally {
+      this.cleanupMyCnfFile(configFile);
     }
   }
 
@@ -39,18 +42,39 @@ export class BackupService {
       throw new Error("Backup file not found");
     }
 
-    const command = `mysql -h ${appConfig.database.host} -P ${appConfig.database.port} -u ${appConfig.database.user} -p${appConfig.database.password} ${appConfig.database.database} < ${filepath}`;
+    const configFile = this.createMyCnfFile();
 
     try {
+      const command = `mysql --defaults-extra-file=${configFile} ${appConfig.database.database} < ${filepath}`;
       await execAsync(command);
       console.log(`Backup restored from: ${filepath}`);
     } catch (error) {
       console.error("Restore failed:", error);
       throw new Error("Failed to restore backup");
+    } finally {
+      this.cleanupMyCnfFile(configFile);
     }
   }
 
-  static async listBackups(): Promise<
+  private static createMyCnfFile(): string {
+    const configPath = path.join(this.backupsDir, `.my.cnf.${Date.now()}`);
+    const configContent = `[client]
+host=${appConfig.database.host}
+port=${appConfig.database.port}
+user=${appConfig.database.user}
+password=${appConfig.database.password}
+`;
+    fs.writeFileSync(configPath, configContent, { mode: 0o600 });
+    return configPath;
+  }
+
+  private static cleanupMyCnfFile(configPath: string): void {
+    if (fs.existsSync(configPath)) {
+      fs.unlinkSync(configPath);
+    }
+  }
+
+  static async listBackups(): Promise
     Array<{
       filename: string;
       filepath: string;

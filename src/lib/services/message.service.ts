@@ -37,7 +37,6 @@ export class MessageService {
     let deviceIndex = 0;
 
     for (const contact of params.contacts) {
-      // Round Robin Logic
       const device = devices[deviceIndex % devices.length];
 
       const msg = await this.sendMessage({
@@ -49,7 +48,6 @@ export class MessageService {
 
       results.push(msg);
 
-      // Only increment index if Round Robin is enabled, otherwise use first device
       if (params.useRoundRobin !== false) {
         deviceIndex++;
       }

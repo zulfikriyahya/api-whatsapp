@@ -1,11 +1,9 @@
-// src/app/api/health/route.ts
 import { NextRequest } from "next/server";
 import { healthCheck } from "@/lib/db";
 import { whatsappClientManager } from "@/lib/whatsapp/client-manager";
 import { messageQueue } from "@/lib/whatsapp/message-queue";
 import { successResponse, handleApiError } from "@/lib/utils/api-response";
 
-// PERBAIKAN: Ubah 'request' menjadi '_request'
 export async function GET(_request: NextRequest) {
   try {
     const dbHealthy = await healthCheck();
@@ -30,6 +28,11 @@ export async function GET(_request: NextRequest) {
           activeClients: activeClients.length,
           clients: activeClients,
         },
+      },
+      uptime: process.uptime(),
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
       },
     };
 
