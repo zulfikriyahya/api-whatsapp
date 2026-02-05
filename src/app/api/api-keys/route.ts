@@ -1,4 +1,3 @@
-// src/app/api/api-keys/route.ts
 import { NextRequest } from "next/server";
 import { ApiKeyQueries } from "@/lib/db/queries/api-key.queries";
 import { createApiKeySchema, validate } from "@/lib/validations/schemas";
@@ -11,7 +10,6 @@ import {
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 
-// Hapus parameter request
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -46,15 +44,11 @@ export async function POST(_request: NextRequest) {
 
     const validation = validate(createApiKeySchema, body);
     if (!validation.success) {
-      // validation.errors pasti ada jika success false (berkat perbaikan schema)
       return validationErrorResponse(validation.errors);
     }
 
-    // PERBAIKAN: Gunakan ! atau perbaikan schema menjamin data ada.
-    // Dengan perbaikan schema.ts, validation.data sudah terjamin ada di sini.
-    // Jika masih error di editor lama, gunakan validation.data!.name
     const { apiKey, plainKey } = await ApiKeyQueries.create({
-      name: validation.data.name,
+      name: validation.data!.name,
       user_id: session.user.id,
     });
 

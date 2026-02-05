@@ -1,4 +1,3 @@
-// src/lib/auth/mfa.ts
 import speakeasy from "speakeasy";
 import { query, queryOne } from "@/lib/db";
 

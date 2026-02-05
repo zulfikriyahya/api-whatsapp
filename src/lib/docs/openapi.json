@@ -3,12 +3,12 @@
   "info": {
     "title": "WhatsApp Dashboard API",
     "version": "1.0.0",
-    "description": "API documentation for WhatsApp Dashboard Multi-Device"
+    "description": "REST API documentation for WhatsApp Dashboard Multi-Device. Manage devices, send messages, and sync contacts."
   },
   "servers": [
     {
       "url": "http://localhost:3000/api",
-      "description": "Local server"
+      "description": "Local Development Server"
     }
   ],
   "components": {
@@ -32,30 +32,70 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "deviceId": { "type": "string", "format": "uuid" },
-                  "toNumber": { "type": "string" },
-                  "message": { "type": "string" }
+                  "deviceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID of the sending device"
+                  },
+                  "toNumber": {
+                    "type": "string",
+                    "description": "Target phone number (e.g. 62812345678)"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Text message content"
+                  }
                 },
                 "required": ["deviceId", "toNumber", "message"]
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceId": { "type": "string", "format": "uuid" },
+                  "toNumber": { "type": "string" },
+                  "message": { "type": "string" },
+                  "media": { "type": "string", "format": "binary" }
+                },
+                "required": ["deviceId", "toNumber"]
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Message queued"
-          }
+          "200": { "description": "Message queued successfully" },
+          "401": { "description": "Unauthorized" },
+          "422": { "description": "Validation Error" }
         }
       }
     },
     "/devices": {
       "get": {
-        "summary": "List devices",
+        "summary": "List all devices",
+        "security": [{ "ApiKeyAuth": [] }],
         "responses": {
-          "200": {
-            "description": "List of devices"
-          }
+          "200": { "description": "List of devices" }
         }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "summary": "List contacts",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": { "200": { "description": "Paginated contacts list" } }
       }
     }
   }

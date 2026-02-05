@@ -1,4 +1,3 @@
-// src/app/api/settings/route.ts
 import { NextRequest } from "next/server";
 import { SettingsService } from "@/lib/services/settings.service";
 import {
@@ -15,9 +14,7 @@ import { UserRole } from "@/types/database.types";
 export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return unauthorizedResponse();
-    }
+    if (!session?.user) return unauthorizedResponse();
 
     const { searchParams } = new URL(_request.url);
     const scope = searchParams.get("scope") || "user";
@@ -40,22 +37,20 @@ export async function GET(_request: NextRequest) {
 export async function PUT(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return unauthorizedResponse();
-    }
+    if (!session?.user) return unauthorizedResponse();
 
     const body = await _request.json();
     const { scope, settings } = body;
 
     if (!settings) {
       return validationErrorResponse([
-        { field: "settings", message: "Settings are required" },
+        { field: "settings", message: "Settings object required" },
       ]);
     }
 
     if (scope === "system") {
       if (session.user.role !== UserRole.ADMIN) {
-        return forbiddenResponse("Admin access required");
+        return forbiddenResponse();
       }
       await SettingsService.updateSystemSettings(settings);
     } else {

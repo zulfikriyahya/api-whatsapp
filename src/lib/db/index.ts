@@ -1,4 +1,3 @@
-// src/lib/db/index.ts
 import mysql from "mysql2/promise";
 import { appConfig } from "@/config/app.config";
 
@@ -29,13 +28,10 @@ class Database {
         enableKeepAlive: true,
         keepAliveInitialDelay: 0,
         timezone: "+00:00",
-        // Additional recommended settings
-        multipleStatements: false, // Security: prevent SQL injection
+        multipleStatements: false,
         namedPlaceholders: true,
       });
 
-      // Handle pool errors
-      // Cast to any to bypass strict event typing in mysql2/promise
       (this.pool as any).on("error", (err: any) => {
         console.error("Database pool error:", err);
         if (err.code === "PROTOCOL_CONNECTION_LOST") {
@@ -49,7 +45,7 @@ class Database {
 
   private reconnect(): void {
     if (this.pool) {
-      this.pool.end();
+      this.pool.end().catch(console.error);
       this.pool = null;
     }
     this.getPool();
@@ -62,7 +58,7 @@ class Database {
       return rows as T;
     } catch (error) {
       console.error("Query error:", error);
-      throw new DatabaseError("Query execution failed", { cause: error });
+      throw error;
     }
   }
 
@@ -71,28 +67,7 @@ class Database {
     params?: any[],
   ): Promise<T | null> {
     const rows = await this.query<T[]>(sql, params);
-    // FIX: Explicitly cast rows[0] to T to satisfy strict null checks
-    return rows.length > 0 ? (rows[0] as T) : null;
-  }
-
-  public async transaction<T>(
-    callback: (connection: mysql.PoolConnection) => Promise<T>,
-  ): Promise<T> {
-    const pool = this.getPool();
-    const connection = await pool.getConnection();
-
-    try {
-      await connection.beginTransaction();
-      const result = await callback(connection);
-      await connection.commit();
-      return result;
-    } catch (error) {
-      await connection.rollback();
-      console.error("Transaction error:", error);
-      throw new DatabaseError("Transaction failed", { cause: error });
-    } finally {
-      connection.release();
-    }
+    return Array.isArray(rows) && rows.length > 0 ? (rows[0] as T) : null;
   }
 
   public async close(): Promise<void> {
@@ -113,32 +88,15 @@ class Database {
   }
 }
 
-// Custom error class
-export class DatabaseError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "DatabaseError";
-  }
-}
-
-// Singleton instance
 const db = Database.getInstance();
 
-// Export convenient methods
 export const query = <T = any>(sql: string, params?: any[]): Promise<T> =>
   db.query<T>(sql, params);
-
 export const queryOne = <T = any>(
   sql: string,
   params?: any[],
 ): Promise<T | null> => db.queryOne<T>(sql, params);
-
-export const transaction = <T>(
-  callback: (connection: mysql.PoolConnection) => Promise<T>,
-): Promise<T> => db.transaction<T>(callback);
-
 export const closeDatabase = (): Promise<void> => db.close();
-
 export const healthCheck = (): Promise<boolean> => db.healthCheck();
 
 export default db;

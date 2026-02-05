@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Send,
@@ -9,6 +9,8 @@ import {
   User,
   FileText,
   MessageSquare,
+  Paperclip,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   DeviceViewModel,
@@ -25,18 +27,18 @@ export function NewMessageModal({ onClose, onSuccess }: NewMessageModalProps) {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
-  // Data Lists
   const [devices, setDevices] = useState<DeviceViewModel[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
 
-  // Form State
   const [selectedDevice, setSelectedDevice] = useState("");
   const [toNumber, setToNumber] = useState("");
   const [message, setMessage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState("");
 
-  // Fetch Data (Devices, Contacts, Templates) saat modal dibuka
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -45,48 +47,48 @@ export function NewMessageModal({ onClose, onSuccess }: NewMessageModalProps) {
           fetch("/api/contacts"),
           fetch("/api/templates"),
         ]);
-
         const devJson = await devRes.json();
         const conJson = await conRes.json();
         const tplJson = await tplRes.json();
 
         if (devJson.success) {
-          // Hanya ambil device yang CONNECTED/AUTHENTICATED
-          const activeDevices = devJson.data.filter(
+          const active = devJson.data.filter(
             (d: any) => d.status === "AUTHENTICATED",
           );
-          setDevices(activeDevices);
-          // Auto select jika hanya ada 1 device
-          if (activeDevices.length === 1)
-            setSelectedDevice(activeDevices[0].id);
+          setDevices(active);
+          if (active.length === 1) setSelectedDevice(active[0].id);
         }
         if (conJson.success) setContacts(conJson.data);
         if (tplJson.success) setTemplates(tplJson.data);
       } catch (err) {
-        console.error("Failed to fetch initial data", err);
-        setError("Failed to load required data. Please check your connection.");
+        console.error(err);
+        setError("Gagal memuat data.");
       } finally {
         setFetching(false);
       }
     };
-
     fetchData();
   }, []);
 
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const tplId = e.target.value;
-    if (!tplId) return;
+    const tpl = templates.find((t) => t.id === e.target.value);
+    if (tpl) setMessage(tpl.content);
+  };
 
-    const tpl = templates.find((t) => t.id === tplId);
-    if (tpl) {
-      setMessage(tpl.content);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDevice || !toNumber || !message) {
-      setError("Please fill in all fields.");
+    if (!selectedDevice || !toNumber) {
+      setError("Device dan Nomor Tujuan wajib diisi.");
+      return;
+    }
+    if (!message && !selectedFile) {
+      setError("Isi pesan atau pilih file.");
       return;
     }
 
@@ -94,21 +96,26 @@ export function NewMessageModal({ onClose, onSuccess }: NewMessageModalProps) {
     setError("");
 
     try {
+      // PENTING: Gunakan FormData untuk support File Upload
+      const formData = new FormData();
+      formData.append("deviceId", selectedDevice);
+      formData.append("toNumber", toNumber.replace(/\D/g, ""));
+      formData.append("message", message);
+
+      if (selectedFile) {
+        formData.append("media", selectedFile);
+      }
+
+      // API Routes akan membaca ini dengan req.formData()
       const res = await fetch("/api/messages/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId: selectedDevice,
-          toNumber: toNumber.replace(/\D/g, ""), // Bersihkan nomor dari karakter non-digit
-          message: message,
-        }),
+        body: formData,
+        // Jangan set Content-Type header manual saat pakai FormData, browser akan handle boundary-nya
       });
 
       const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error?.message || "Failed to send message");
-      }
+      if (!res.ok)
+        throw new Error(json.error?.message || "Gagal mengirim pesan");
 
       onSuccess();
     } catch (err: any) {
@@ -123,14 +130,13 @@ export function NewMessageModal({ onClose, onSuccess }: NewMessageModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
       onClick={onClose}>
       <div
-        className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
-            <h3 className="font-bold text-xl">New Message</h3>
+            <h3 className="font-bold text-xl">Kirim Pesan</h3>
             <p className="text-sm text-muted-foreground">
-              Send a WhatsApp message instantly.
+              Kirim pesan teks atau media.
             </p>
           </div>
           <button
@@ -140,92 +146,69 @@ export function NewMessageModal({ onClose, onSuccess }: NewMessageModalProps) {
           </button>
         </div>
 
-        {/* Form Body */}
         <div className="p-6 overflow-y-auto">
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm font-medium">
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 text-red-600 text-sm font-medium">
               {error}
             </div>
           )}
 
           {fetching ? (
-            <div className="flex flex-col items-center justify-center py-10 space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Loading resources...
-              </p>
+            <div className="py-10 text-center">
+              <Loader2 className="animate-spin mx-auto text-primary" />
             </div>
           ) : (
-            <form
-              id="message-form"
-              onSubmit={handleSubmit}
-              className="space-y-5">
-              {/* Device Select */}
+            <form id="msg-form" onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <Smartphone size={16} className="text-muted-foreground" />{" "}
-                  Sender Device
+                  <Smartphone size={16} /> Sender Device
                 </label>
                 <select
-                  className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-input outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-input outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                   value={selectedDevice}
                   onChange={(e) => setSelectedDevice(e.target.value)}
                   required>
-                  <option value="">-- Select Active Device --</option>
+                  <option value="">-- Pilih Device --</option>
                   {devices.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name} ({d.phone_number})
                     </option>
                   ))}
                 </select>
-                {devices.length === 0 && (
-                  <p className="text-xs text-red-500">
-                    No authenticated devices found. Please connect a device
-                    first.
-                  </p>
-                )}
               </div>
 
-              {/* Recipient Input with Datalist */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <User size={16} className="text-muted-foreground" /> Recipient
-                  Number
+                  <User size={16} /> Nomor Tujuan
                 </label>
                 <input
                   list="contacts-list"
                   type="text"
-                  className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-input outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  placeholder="Type number or search contact..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-input outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="08123xxxxx"
                   value={toNumber}
                   onChange={(e) => setToNumber(e.target.value)}
                   required
-                  autoComplete="off"
                 />
                 <datalist id="contacts-list">
                   {contacts.map((c) => (
                     <option key={c.id} value={c.phone_number}>
-                      {c.name} ({c.phone_number})
+                      {c.name}
                     </option>
                   ))}
                 </datalist>
-                <p className="text-xs text-muted-foreground">
-                  Example: 628123456789
-                </p>
               </div>
 
-              {/* Template Select */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <FileText size={16} className="text-muted-foreground" /> Use
-                  Template (Optional)
+                  <FileText size={16} /> Template
                 </label>
                 <select
-                  className="w-full px-4 py-2 rounded-xl bg-muted/30 border border-input outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                  className="w-full px-4 py-2 rounded-xl bg-muted/30 border border-input text-sm"
                   onChange={handleTemplateChange}
                   defaultValue="">
                   <option value="" disabled>
-                    -- Load a Template --
+                    -- Load Template --
                   </option>
                   {templates.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -235,43 +218,83 @@ export function NewMessageModal({ onClose, onSuccess }: NewMessageModalProps) {
                 </select>
               </div>
 
-              {/* Message Textarea */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <MessageSquare size={16} className="text-muted-foreground" />{" "}
-                  Message
+                  <MessageSquare size={16} /> Pesan / Caption
                 </label>
                 <textarea
-                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-input outline-none focus:ring-2 focus:ring-primary/20 transition-all min-h-[120px] resize-none"
-                  placeholder="Type your message here..."
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-input outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px] resize-none"
+                  placeholder="Ketik pesan..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  required
                 />
+              </div>
+
+              {/* Media Upload Area */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Paperclip size={16} /> Lampiran Media (Opsional)
+                </label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/*,video/*,application/pdf"
+                />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/30 transition-colors">
+                  {selectedFile ? (
+                    <div className="flex items-center gap-3 text-sm text-primary font-medium">
+                      <ImageIcon size={20} /> {selectedFile.name}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                        }}
+                        className="text-red-500 hover:text-red-600">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground text-sm">
+                      <span className="font-semibold text-primary">
+                        Klik upload
+                      </span>{" "}
+                      atau drag file
+                      <br />
+                      <span className="text-xs">
+                        (Gambar, Video, PDF max 10MB)
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </form>
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-border bg-muted/10 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+            className="px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-muted"
             disabled={loading}>
-            Cancel
+            Batal
           </button>
           <button
-            form="message-form"
+            form="msg-form"
             type="submit"
             disabled={loading || fetching || !selectedDevice}
-            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all flex items-center gap-2 disabled:opacity-50">
+            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-lg flex items-center gap-2">
             {loading ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <Send size={16} />
-            )}
-            Send Now
+            )}{" "}
+            Kirim
           </button>
         </div>
       </div>

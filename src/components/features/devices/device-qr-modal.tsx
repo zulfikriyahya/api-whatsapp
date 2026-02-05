@@ -1,152 +1,123 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, CheckCircle, RefreshCw, AlertCircle } from "lucide-react";
+import { X, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { DeviceStatus } from "@/types/database.types";
+import Image from "next/image";
 
-interface DeviceQRModalProps {
+interface Props {
   deviceId: string;
   deviceName: string;
   onClose: () => void;
   onConnected: () => void;
 }
 
-type ModalState = "LOADING" | "WAITING" | "READY" | "CONNECTED" | "ERROR";
-
-// Pastikan menggunakan 'export function'
 export function DeviceQRModal({
   deviceId,
   deviceName,
   onClose,
   onConnected,
-}: DeviceQRModalProps) {
-  const [qrCode, setQrCode] = useState<string | null>(null);
-  const [state, setState] = useState<ModalState>("LOADING");
-  const [retryCount, setRetryCount] = useState(0);
+}: Props) {
+  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [status, setStatus] = useState<DeviceStatus>(DeviceStatus.CONNECTING);
+  const [error, setError] = useState("");
 
   const fetchQR = useCallback(async () => {
     try {
+      // Panggil API dengan format=image agar dapat base64 langsung
       const res = await fetch(`/api/devices/${deviceId}/qr?format=image`);
-      if (!res.ok) throw new Error("Failed to fetch QR");
-
       const json = await res.json();
-      const { status, qrCode: qrData } = json.data;
 
-      if (
-        status === DeviceStatus.AUTHENTICATED ||
-        status === DeviceStatus.CONNECTED
-      ) {
-        setState("CONNECTED");
-        setTimeout(() => {
+      if (json.success) {
+        setStatus(json.data.status);
+
+        // Jika status authenticated, trigger success
+        if (
+          json.data.status === DeviceStatus.AUTHENTICATED ||
+          json.data.status === DeviceStatus.CONNECTED
+        ) {
           onConnected();
-        }, 1500);
-        return true;
-      }
+          return true; // Stop polling
+        }
 
-      if (qrData) {
-        setQrCode(qrData);
-        setState("READY");
+        // Update QR Image jika ada
+        if (json.data.qrCode) {
+          setQrImage(json.data.qrCode);
+        }
       } else {
-        setState("WAITING");
+        setError(json.error?.message || "Gagal mengambil QR");
       }
-
-      return false;
-    } catch (error) {
-      console.error(error);
-      if (state === "LOADING") setState("ERROR");
-      return false;
+    } catch (e) {
+      console.error(e);
+      setError("Koneksi terputus");
     }
-  }, [deviceId, onConnected, state]);
+    return false;
+  }, [deviceId, onConnected]);
 
+  // Polling QR setiap 3 detik
   useEffect(() => {
-    let isMounted = true;
-    let intervalId: NodeJS.Timeout;
+    fetchQR();
+    const interval = setInterval(async () => {
+      const stop = await fetchQR();
+      if (stop) clearInterval(interval);
+    }, 3000);
 
-    const startPolling = async () => {
-      const shouldStop = await fetchQR();
-      if (shouldStop || !isMounted) return;
-
-      intervalId = setInterval(async () => {
-        if (!isMounted) return;
-        const stop = await fetchQR();
-        if (stop) clearInterval(intervalId);
-      }, 3000);
-    };
-
-    startPolling();
-
-    return () => {
-      isMounted = false;
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [fetchQR, retryCount]);
+    return () => clearInterval(interval);
+  }, [fetchQR]);
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-      onClick={onClose}>
-      <div
-        className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div>
-            <h3 className="font-bold text-lg">Link Device</h3>
-            <p className="text-xs text-muted-foreground">{deviceName}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-muted rounded-full transition-colors">
-            <X size={20} />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-muted rounded-full z-10">
+          <X size={20} />
+        </button>
 
-        <div className="p-8 flex flex-col items-center justify-center min-h-[320px]">
-          {(state === "LOADING" || state === "WAITING") && (
-            <div className="text-center space-y-4">
-              <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-              <div>
-                <h4 className="font-semibold text-lg">Initializing...</h4>
-                <p className="text-sm text-muted-foreground">
-                  Preparing WhatsApp client...
-                </p>
+        <div className="p-6 text-center">
+          <h3 className="font-bold text-xl mb-1">Link Device</h3>
+          <p className="text-sm text-muted-foreground mb-6">{deviceName}</p>
+
+          <div className="min-h-[250px] flex items-center justify-center bg-muted/20 rounded-xl border border-dashed border-muted mb-4 relative">
+            {status === DeviceStatus.AUTHENTICATED ? (
+              <div className="text-green-500 flex flex-col items-center animate-in zoom-in">
+                <CheckCircle size={64} className="mb-2" />
+                <span className="font-bold">Connected!</span>
               </div>
-            </div>
-          )}
-
-          {state === "READY" && qrCode && (
-            <div className="text-center space-y-6 w-full">
-              <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm mx-auto w-fit">
+            ) : qrImage ? (
+              <div className="p-4 bg-white rounded-xl shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={qrCode}
+                  src={qrImage}
                   alt="Scan QR"
                   className="w-56 h-56 object-contain"
                 />
               </div>
-              <p className="text-sm font-medium">Scan with WhatsApp</p>
-            </div>
-          )}
+            ) : error ? (
+              <div className="text-red-500 flex flex-col items-center px-4">
+                <AlertTriangle size={48} className="mb-2 opacity-50" />
+                <span className="text-sm">{error}</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-muted-foreground">
+                <Loader2 size={40} className="animate-spin mb-2 text-primary" />
+                <span className="text-xs">
+                  Menunggu QR Code dari WhatsApp...
+                </span>
+              </div>
+            )}
+          </div>
 
-          {state === "CONNECTED" && (
-            <div className="text-center space-y-4">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-              <h4 className="font-bold text-xl text-green-600">Connected!</h4>
-            </div>
-          )}
-
-          {state === "ERROR" && (
-            <div className="text-center space-y-4">
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-              <p className="text-sm">Connection Failed</p>
-              <button
-                onClick={() => {
-                  setState("LOADING");
-                  setRetryCount((c) => c + 1);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg">
-                <RefreshCw size={16} /> Retry
-              </button>
-            </div>
-          )}
+          <div className="text-left text-sm space-y-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl">
+            <p className="font-semibold text-blue-700 dark:text-blue-300">
+              Cara Scan:
+            </p>
+            <ol className="list-decimal pl-4 space-y-1 text-muted-foreground text-xs">
+              <li>Buka WhatsApp di HP Anda</li>
+              <li>Menu &gt; Perangkat Tertaut &gt; Tautkan Perangkat</li>
+              <li>Arahkan kamera ke QR Code di atas</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>

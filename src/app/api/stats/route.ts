@@ -10,10 +10,6 @@ import {
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 
-/**
- * GET /api/stats
- * Get dashboard statistics
- */
 export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -31,17 +27,16 @@ export async function GET(_request: NextRequest) {
       ? new Date(searchParams.get("endDate")!)
       : undefined;
 
-    // Get message statistics
+    // Fix: method getMessageStats sudah ditambahkan di Service
     const messageStats = await MessageService.getMessageStats({
       deviceId,
       startDate,
       endDate,
     });
 
-    // Get hourly statistics
     const hourlyStats = await MessageService.getHourlyStats(deviceId, 24);
 
-    // Get device statistics
+    // Fix: method getUserDevices sudah ditambahkan di Service
     const devices = await DeviceService.getUserDevices(session.user.id);
     const deviceStats = devices.map((device) => ({
       deviceId: device.id,
@@ -52,7 +47,6 @@ export async function GET(_request: NextRequest) {
       lastMessageAt: device.last_message_at,
     }));
 
-    // Calculate totals
     const totalDevices = devices.length;
     const activeDevices = devices.filter(
       (d) => d.status === "AUTHENTICATED" && d.is_ready,
@@ -80,10 +74,6 @@ export async function GET(_request: NextRequest) {
   }
 }
 
-/**
- * GET /api/stats/summary
- * Get quick summary for dashboard cards
- */
 export async function HEAD(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -93,7 +83,7 @@ export async function HEAD(_request: NextRequest) {
     }
 
     const devices = await DeviceService.getUserDevices(session.user.id);
-    const todayStats = await MessageService.getMessageStats();
+    const todayStats = await MessageService.getMessageStats({});
 
     return successResponse({
       totalDevices: devices.length,

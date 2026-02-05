@@ -1,4 +1,3 @@
-// src/lib/services/backup.service.ts
 import * as fs from "fs";
 import * as path from "path";
 import { exec } from "child_process";
@@ -51,7 +50,6 @@ export class BackupService {
     }
   }
 
-  // FIX: Perbaikan syntax generic type di sini
   static async listBackups(): Promise<
     Array<{
       filename: string;

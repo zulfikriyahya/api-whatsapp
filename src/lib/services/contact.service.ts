@@ -1,4 +1,3 @@
-// src/lib/services/contact.service.ts
 import { query, queryOne } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { Contact, CreateContactDTO } from "@/types/database.types";

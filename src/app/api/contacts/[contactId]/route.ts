@@ -1,4 +1,3 @@
-// src/app/api/contacts/[contactId]/route.ts
 import { NextRequest } from "next/server";
 import { ContactService } from "@/lib/services/contact.service";
 import { updateContactSchema, validate } from "@/lib/validations/schemas";
@@ -19,7 +18,6 @@ type Params = {
   }>;
 };
 
-// FIX: Ubah request jadi _request
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);
@@ -68,7 +66,6 @@ export async function PATCH(_request: NextRequest, { params }: Params) {
       return validationErrorResponse(validation.errors);
     }
 
-    // PERBAIKAN: Mapping manual dari hasil validasi Zod (camelCase) ke DTO (snake_case)
     await ContactService.updateContact(contactId, {
       name: validation.data.name,
       phone_number: validation.data.phoneNumber,
@@ -83,7 +80,6 @@ export async function PATCH(_request: NextRequest, { params }: Params) {
   }
 }
 
-// FIX: Ubah request jadi _request
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);

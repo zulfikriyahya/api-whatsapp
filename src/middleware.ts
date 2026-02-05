@@ -1,14 +1,17 @@
-// src/middleware.ts
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
-  function middleware(_req) {
+  function middleware(req) {
+    // Bisa tambahkan logic custom di sini, misal cek role user
     return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token }) => !!token, // Return true jika token ada (login)
+    },
+    pages: {
+      signIn: "/login",
     },
   },
 );
@@ -18,14 +21,10 @@ export const config = {
     "/dashboard/:path*",
     "/devices/:path*",
     "/messages/:path*",
+    "/contacts/:path*",
+    "/settings/:path*",
+    // Lindungi API routes kecuali public ones
     "/api/devices/:path*",
     "/api/messages/:path*",
-    "/api/contacts/:path*",
-    "/api/templates/:path*",
-    "/api/auto-response/:path*",
-    "/api/backup/:path*",
-    "/api/webhooks/:path*",
-    "/api/api-keys/:path*",
-    "/api/stats/:path*",
   ],
 };

@@ -1,11 +1,16 @@
-// src/lib/whatsapp/client-manager.ts
-import { Client, LocalAuth, Message } from "whatsapp-web.js";
-import { DeviceStatus, MessageStatus } from "@/types/database.types";
-import { query } from "@/lib/db";
+import { Client, LocalAuth, Message, MessageMedia } from "whatsapp-web.js";
+import {
+  DeviceStatus,
+  MessageStatus,
+  MessageDirection,
+} from "@/types/database.types";
+import { query, queryOne } from "@/lib/db";
 import { appConfig } from "@/config/app.config";
+import { WebhookService } from "@/lib/services/webhook.service";
 import * as fs from "fs";
+import * as path from "path";
+import { v4 as uuidv4 } from "uuid";
 
-// Singleton Pattern untuk Next.js Hot Reload
 const globalForWhatsapp = global as unknown as {
   whatsappClientManager: WhatsAppClientManager | undefined;
 };
@@ -27,8 +32,6 @@ export class WhatsAppClientManager {
     this.sessionPath = appConfig.whatsapp.sessionPath;
     this.ensureSessionDirectory();
     this.startHealthCheck();
-
-    // Setup signal handlers only once
     this.setupSignalHandlers();
   }
 
@@ -38,9 +41,7 @@ export class WhatsAppClientManager {
     }
   }
 
-  // --- LOGIC BARU: SIGNAL HANDLERS ---
   private setupSignalHandlers() {
-    // Hindari duplikasi listener saat hot reload
     if (process.env.NODE_ENV === "production") {
       const handleShutdown = async (signal: string) => {
         console.log(`${signal} received, disconnecting all clients...`);
@@ -48,7 +49,6 @@ export class WhatsAppClientManager {
         process.exit(0);
       };
 
-      // Pastikan tidak menumpuk listener
       process.removeAllListeners("SIGTERM");
       process.removeAllListeners("SIGINT");
 
@@ -57,20 +57,53 @@ export class WhatsAppClientManager {
     }
   }
 
+  async postStatus(
+    deviceId: string,
+    text: string,
+    mediaPath?: string,
+  ): Promise<void> {
+    const instance = this.clients.get(deviceId);
+    if (!instance?.client || instance.status !== DeviceStatus.AUTHENTICATED) {
+      throw new Error("Device not ready");
+    }
+
+    try {
+      const statusJid = "status@broadcast";
+
+      if (mediaPath) {
+        const absolutePath = path.join(process.cwd(), "public", mediaPath);
+        if (!fs.existsSync(absolutePath)) {
+          throw new Error("Media file not found");
+        }
+        const media = MessageMedia.fromFilePath(absolutePath);
+        await instance.client.sendMessage(statusJid, media, {
+          caption: text || "",
+        });
+      } else if (text) {
+        await instance.client.sendMessage(statusJid, text, {
+          backgroundColor: "#3b82f6",
+          font: 1,
+        });
+      } else {
+        throw new Error("Content required (text or media)");
+      }
+
+      console.log(`[Status] Posted for device ${deviceId}`);
+    } catch (error: any) {
+      console.error(`[Status] Failed:`, error);
+      throw new Error(`Failed to post status: ${error.message}`);
+    }
+  }
+
   async initializeClient(deviceId: string, phoneNumber: string): Promise<void> {
     if (this.initializationLocks.has(deviceId)) {
-      console.log(`Waiting for existing initialization for device ${deviceId}`);
       await this.initializationLocks.get(deviceId);
       return;
     }
 
     if (this.clients.has(deviceId)) {
       const existing = this.clients.get(deviceId);
-      // Jika sudah ready, jangan init ulang
       if (existing?.client && existing.status === DeviceStatus.AUTHENTICATED) {
-        console.log(
-          `Client already initialized and ready for device ${deviceId}`,
-        );
         return;
       }
     }
@@ -89,9 +122,6 @@ export class WhatsAppClientManager {
     deviceId: string,
     _phoneNumber: string,
   ): Promise<void> {
-    console.log(`Initializing client for device ${deviceId}`);
-
-    // CONFIGURASI PUPPETEER KHUSUS DOCKER & VPS
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: deviceId,
@@ -109,7 +139,6 @@ export class WhatsAppClientManager {
           "--disable-gpu",
         ],
       },
-      // PENTING: Gunakan cache remote agar tidak perlu download ulang saat update WA Web
       webVersionCache: {
         type: "remote",
         remotePath:
@@ -127,7 +156,6 @@ export class WhatsAppClientManager {
     this.setupClientEvents(client, deviceId);
 
     try {
-      // Tingkatkan timeout menjadi 2 menit untuk koneksi lambat
       await Promise.race([
         client.initialize(),
         new Promise((_, reject) =>
@@ -143,13 +171,11 @@ export class WhatsAppClientManager {
       );
       await this.updateDeviceStatus(deviceId, DeviceStatus.ERROR);
       this.clients.delete(deviceId);
-      // Jangan throw error di sini agar loop init tidak mematikan server
     }
   }
 
   private setupClientEvents(client: Client, deviceId: string): void {
     client.on("qr", async (qr: string) => {
-      console.log(`QR Code received for device ${deviceId}`);
       const instance = this.clients.get(deviceId);
       if (instance) {
         instance.qrCode = qr;
@@ -160,7 +186,6 @@ export class WhatsAppClientManager {
     });
 
     client.on("ready", async () => {
-      console.log(`Client is ready for device ${deviceId}`);
       const instance = this.clients.get(deviceId);
       if (instance) {
         instance.status = DeviceStatus.AUTHENTICATED;
@@ -175,21 +200,31 @@ export class WhatsAppClientManager {
     });
 
     client.on("authenticated", async () => {
-      console.log(`Client authenticated for device ${deviceId}`);
       await this.updateDeviceStatus(deviceId, DeviceStatus.CONNECTED);
     });
 
-    client.on("disconnected", async (reason: string) => {
-      console.log(`Client disconnected for device ${deviceId}:`, reason);
+    client.on("disconnected", async () => {
       await this.updateDeviceStatus(deviceId, DeviceStatus.DISCONNECTED, false);
       this.clients.delete(deviceId);
     });
 
+    client.on("message_ack", async (msg, ack) => {
+      let status = MessageStatus.SENT;
+      if (ack === 1) status = MessageStatus.SENT;
+      if (ack === 2) status = MessageStatus.DELIVERED;
+      if (ack === 3) status = MessageStatus.READ;
+
+      WebhookService.triggerWebhook("message.status", {
+        deviceId,
+        status,
+        ackRaw: ack,
+        timestamp: new Date(),
+      }).catch(console.error);
+    });
+
     client.on("message", async (message: Message) => {
-      // Update last activity
       const instance = this.clients.get(deviceId);
       if (instance) instance.lastActivity = new Date();
-
       await this.handleIncomingMessage(deviceId, message);
     });
   }
@@ -201,6 +236,37 @@ export class WhatsAppClientManager {
     try {
       if (message.fromMe) return;
 
+      const device = await this.getDeviceUserId(deviceId);
+      if (!device) return;
+
+      const fromNumber = message.from.replace("@c.us", "");
+      const messageBody = message.body;
+
+      const messageId = uuidv4();
+      await query(
+        `INSERT INTO messages 
+        (id, device_id, user_id, from_number, to_number, message, direction, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          messageId,
+          deviceId,
+          device.user_id,
+          fromNumber,
+          device.phone_number,
+          messageBody,
+          MessageDirection.INBOUND,
+          MessageStatus.DELIVERED,
+        ],
+      );
+
+      await WebhookService.triggerWebhook("message.received", {
+        messageId,
+        deviceId,
+        from: fromNumber,
+        message: messageBody,
+        timestamp: new Date(),
+      });
+
       const rules: any[] = await query(
         `SELECT * FROM auto_response_rules
          WHERE device_id = ? AND is_active = true
@@ -209,18 +275,40 @@ export class WhatsAppClientManager {
       );
 
       for (const rule of rules) {
-        const messageBody = message.body.toLowerCase();
-        const keyword = rule.keyword.toLowerCase();
-
-        if (messageBody.includes(keyword)) {
+        if (messageBody.toLowerCase().includes(rule.keyword.toLowerCase())) {
           await message.reply(rule.response);
-          console.log(`Auto-response sent for device ${deviceId}`);
+
+          const replyId = uuidv4();
+          await query(
+            `INSERT INTO messages 
+            (id, device_id, user_id, to_number, message, direction, status, sent_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+              replyId,
+              deviceId,
+              device.user_id,
+              fromNumber,
+              rule.response,
+              MessageDirection.OUTBOUND,
+              MessageStatus.SENT,
+            ],
+          );
           break;
         }
       }
     } catch (error) {
       console.error("Error handling incoming message:", error);
     }
+  }
+
+  private async getDeviceUserId(
+    deviceId: string,
+  ): Promise<{ user_id: string; phone_number: string } | null> {
+    const res: any = await queryOne(
+      "SELECT user_id, phone_number FROM devices WHERE id = ?",
+      [deviceId],
+    );
+    return res;
   }
 
   private async updateDeviceStatus(
@@ -245,6 +333,7 @@ export class WhatsAppClientManager {
     phoneNumber: string,
     message: string,
     messageId: string,
+    mediaPath?: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const instance = this.clients.get(deviceId);
@@ -253,7 +342,6 @@ export class WhatsAppClientManager {
         return { success: false, error: "Device not initialized" };
       }
 
-      // Allow sending if Authenticated OR Connected (kadang status belum update tapi sudah bisa kirim)
       if (
         instance.status !== DeviceStatus.AUTHENTICATED &&
         instance.status !== DeviceStatus.CONNECTED
@@ -263,7 +351,6 @@ export class WhatsAppClientManager {
 
       const formattedNumber = this.formatPhoneNumber(phoneNumber);
 
-      // Cek registrasi WA (Opsional, bisa di-skip untuk performa)
       try {
         const isRegistered =
           await instance.client.isRegisteredUser(formattedNumber);
@@ -277,7 +364,24 @@ export class WhatsAppClientManager {
         console.warn("Skipping registration check due to error/timeout");
       }
 
-      await instance.client.sendMessage(formattedNumber, message);
+      if (mediaPath) {
+        const absolutePath = path.join(process.cwd(), "public", mediaPath);
+
+        if (!fs.existsSync(absolutePath)) {
+          return {
+            success: false,
+            error: "File media tidak ditemukan di server",
+          };
+        }
+
+        const media = MessageMedia.fromFilePath(absolutePath);
+        await instance.client.sendMessage(formattedNumber, media, {
+          caption: message || "",
+        });
+      } else {
+        if (!message) return { success: false, error: "Pesan kosong" };
+        await instance.client.sendMessage(formattedNumber, message);
+      }
 
       instance.lastActivity = new Date();
 
@@ -288,7 +392,6 @@ export class WhatsAppClientManager {
         [MessageStatus.SENT, messageId],
       );
 
-      console.log(`Message sent from device ${deviceId} to ${phoneNumber}`);
       return { success: true };
     } catch (error: any) {
       console.error("Error sending message:", error);
@@ -296,7 +399,6 @@ export class WhatsAppClientManager {
     }
   }
 
-  // NEW: Method untuk Validasi Nomor
   async checkNumber(
     deviceId: string,
     phoneNumber: string,
@@ -325,20 +427,12 @@ export class WhatsAppClientManager {
 
   private formatPhoneNumber(phoneNumber: string): string {
     let formatted = phoneNumber.replace(/\D/g, "");
-
     if (!formatted.startsWith("62") && formatted.startsWith("0")) {
       formatted = "62" + formatted.substring(1);
     }
-
-    // Fallback jika tidak ada 62/0, asumsi indo (opsional)
-    if (!formatted.startsWith("62")) {
-      // formatted = "62" + formatted;
-    }
-
     if (!formatted.endsWith("@c.us")) {
       formatted = `${formatted}@c.us`;
     }
-
     return formatted;
   }
 
@@ -365,12 +459,10 @@ export class WhatsAppClientManager {
       }
       this.clients.delete(deviceId);
       await this.updateDeviceStatus(deviceId, DeviceStatus.DISCONNECTED, false);
-      console.log(`Client disconnected for device ${deviceId}`);
     }
   }
 
   async disconnectAllClients(): Promise<void> {
-    console.log("Disconnecting all clients...");
     const promises = Array.from(this.clients.keys()).map((deviceId) =>
       this.disconnectClient(deviceId),
     );
@@ -382,22 +474,16 @@ export class WhatsAppClientManager {
   }
 
   private startHealthCheck(): void {
-    // Jalankan health check hanya jika belum ada interval (singleton)
-    // Di sini kita biarkan setInterval berjalan
     setInterval(
       () => {
         const now = new Date();
-        const staleThreshold = 30 * 60 * 1000; // 30 menit idle
-
+        const staleThreshold = 30 * 60 * 1000;
         for (const [deviceId, instance] of this.clients.entries()) {
           if (instance.lastActivity) {
             const timeSinceActivity =
               now.getTime() - instance.lastActivity.getTime();
-
             if (timeSinceActivity > staleThreshold) {
-              // Opsional: jangan disconnect otomatis jika ini server utama
-              // console.log(`Removing stale client for device ${deviceId}`);
-              // this.disconnectClient(deviceId);
+              // Log stale clients
             }
           }
         }
@@ -407,7 +493,6 @@ export class WhatsAppClientManager {
   }
 }
 
-// SINGLETON EXPORT
 export const whatsappClientManager =
   globalForWhatsapp.whatsappClientManager || new WhatsAppClientManager();
 

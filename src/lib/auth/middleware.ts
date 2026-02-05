@@ -1,6 +1,4 @@
-// src/lib/auth/middleware.ts
 import { getServerSession } from "next-auth";
-// import { NextRequest } from "next/server";
 import { authOptions } from "./options";
 import { UserRole } from "@/types/database.types";
 

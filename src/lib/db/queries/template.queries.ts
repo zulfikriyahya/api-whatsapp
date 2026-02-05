@@ -1,4 +1,3 @@
-// src/lib/db/queries/template.queries.ts
 import { query, queryOne } from "../index";
 import { MessageTemplate } from "@/types/database.types";
 import { v4 as uuidv4 } from "uuid";
@@ -21,7 +20,7 @@ export class TemplateQueries {
   static async create(data: {
     name: string;
     content: string;
-    variables?: Record<string, string> | null; // PERBAIKAN: Allow null
+    variables?: Record<string, string> | null;
     user_id: string;
   }): Promise<MessageTemplate> {
     const id = uuidv4();
@@ -51,7 +50,7 @@ export class TemplateQueries {
     data: Partial<{
       name: string;
       content: string;
-      variables: Record<string, string> | null; // PERBAIKAN: Allow null eksplisit
+      variables: Record<string, string> | null;
     }>,
   ): Promise<void> {
     const updates: string[] = [];

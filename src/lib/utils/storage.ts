@@ -1,10 +1,8 @@
-// src/lib/utils/storage.ts
 import * as fs from "fs";
 import * as path from "path";
-// import { appConfig } from "@/config/app.config";
 
 export class StorageService {
-  private static uploadsDir = path.join(process.cwd(), "uploads");
+  private static uploadsDir = path.join(process.cwd(), "public", "uploads");
   private static backupsDir = path.join(process.cwd(), "backups");
 
   static ensureDirectories(): void {
@@ -32,12 +30,19 @@ export class StorageService {
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filepath, buffer);
 
-    return filepath;
+    // Return relative path for public access
+    return `/uploads/${userId}/${filename}`;
   }
 
   static async deleteUpload(filepath: string): Promise<void> {
-    if (fs.existsSync(filepath)) {
-      fs.unlinkSync(filepath);
+    // Convert relative public path to absolute system path if needed
+    let absolutePath = filepath;
+    if (filepath.startsWith("/uploads")) {
+      absolutePath = path.join(process.cwd(), "public", filepath);
+    }
+
+    if (fs.existsSync(absolutePath)) {
+      fs.unlinkSync(absolutePath);
     }
   }
 
@@ -55,6 +60,10 @@ export class StorageService {
 
         if (stats.isDirectory()) {
           processDir(filepath);
+          // Remove empty directories
+          if (fs.readdirSync(filepath).length === 0) {
+            fs.rmdirSync(filepath);
+          }
         } else if (stats.mtimeMs < cutoffTime) {
           fs.unlinkSync(filepath);
           deleted++;

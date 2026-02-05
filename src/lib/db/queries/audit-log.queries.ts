@@ -1,4 +1,3 @@
-// src/lib/db/queries/audit-log.queries.ts
 import { query, queryOne } from "../index";
 import { AuditLog } from "@/types/database.types";
 import { v4 as uuidv4 } from "uuid";

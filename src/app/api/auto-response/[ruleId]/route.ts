@@ -1,4 +1,3 @@
-// src/app/api/auto-response/[ruleId]/route.ts
 import { NextRequest } from "next/server";
 import { AutoResponseQueries } from "@/lib/db/queries/auto-response.queries";
 import { DeviceQueries } from "@/lib/db/queries/device.queries";
@@ -54,7 +53,6 @@ export async function PATCH(_request: NextRequest, { params }: Params) {
   }
 }
 
-// FIX: Ubah request jadi _request
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);

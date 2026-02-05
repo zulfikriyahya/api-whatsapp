@@ -1,10 +1,8 @@
-// src/app/api/contacts/export/route.ts
 import { ContactService } from "@/lib/services/contact.service";
 import { handleApiError, unauthorizedResponse } from "@/lib/utils/api-response";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 
-// FIX: Hapus parameter request
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);

@@ -1,4 +1,3 @@
-// src/lib/services/webhook.service.ts
 import { query, queryOne } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
@@ -41,11 +40,7 @@ export class WebhookService {
       "SELECT * FROM webhooks WHERE id = ?",
       [id],
     );
-
-    if (!webhook) {
-      throw new Error("Failed to create webhook");
-    }
-
+    if (!webhook) throw new Error("Failed to create webhook");
     return webhook;
   }
 
@@ -76,17 +71,14 @@ export class WebhookService {
       updates.push("url = ?");
       params.push(data.url);
     }
-
     if (data.events !== undefined) {
       updates.push("events = ?");
       params.push(JSON.stringify(data.events));
     }
-
     if (data.secret !== undefined) {
       updates.push("secret = ?");
       params.push(data.secret);
     }
-
     if (data.is_active !== undefined) {
       updates.push("is_active = ?");
       params.push(data.is_active);
@@ -118,11 +110,13 @@ export class WebhookService {
       [JSON.stringify(event)],
     );
 
+    if (webhooks.length === 0) return;
+
     const promises = webhooks.map((webhook) =>
       this.sendWebhookRequest(webhook, event, payload),
     );
 
-    await Promise.allSettled(promises);
+    Promise.allSettled(promises);
   }
 
   private static async sendWebhookRequest(
@@ -131,15 +125,20 @@ export class WebhookService {
     payload: Record<string, any>,
   ): Promise<void> {
     try {
-      const body = JSON.stringify({
+      const timestamp = new Date().toISOString();
+      const bodyData = {
+        id: uuidv4(),
         event,
-        timestamp: new Date().toISOString(),
+        timestamp,
         data: payload,
-      });
+      };
 
+      const body = JSON.stringify(bodyData);
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "User-Agent": "WA-Dashboard-Webhook/1.0",
         "X-Webhook-Event": event,
+        "X-Webhook-Timestamp": timestamp,
       };
 
       if (webhook.secret) {
@@ -150,15 +149,21 @@ export class WebhookService {
         headers["X-Webhook-Signature"] = signature;
       }
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(webhook.url, {
         method: "POST",
         headers,
         body,
+        signal: controller.signal,
       });
 
+      clearTimeout(timeout);
+
       if (!response.ok) {
-        console.error(
-          `Webhook failed for ${webhook.url}: ${response.statusText}`,
+        console.warn(
+          `Webhook ${webhook.id} failed with status ${response.status}`,
         );
       }
     } catch (error) {

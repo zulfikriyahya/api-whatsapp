@@ -1,5 +1,3 @@
-// src/types/database.types.ts
-
 export enum UserRole {
   ADMIN = "ADMIN",
   USER_A = "USER_A",
@@ -27,11 +25,9 @@ export enum MessageStatus {
   FAILED = "FAILED",
 }
 
-export enum QueueStatus {
-  PENDING = "PENDING",
-  PROCESSING = "PROCESSING",
-  COMPLETED = "COMPLETED",
-  FAILED = "FAILED",
+export enum MessageDirection {
+  INBOUND = "INBOUND",
+  OUTBOUND = "OUTBOUND",
 }
 
 export interface User {
@@ -39,11 +35,8 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  mfa_enabled: boolean;
-  mfa_secret: string | null;
   is_active: boolean;
   created_at: Date;
-  updated_at: Date;
 }
 
 export interface Device {
@@ -53,21 +46,8 @@ export interface Device {
   status: DeviceStatus;
   is_ready: boolean;
   user_id: string;
-  session_data: string | null;
   last_seen: Date | null;
   created_at: Date;
-  updated_at: Date;
-}
-
-export interface Contact {
-  id: string;
-  name: string;
-  phone_number: string;
-  email: string | null;
-  tags: string[] | null;
-  user_id: string;
-  created_at: Date;
-  updated_at: Date;
 }
 
 export interface Message {
@@ -76,24 +56,35 @@ export interface Message {
   user_id: string;
   to_number: string;
   message: string;
+  media_url?: string | null;
+  media_type?: "image" | "video" | "audio" | "document" | null;
+  caption?: string | null;
+  direction: MessageDirection;
+  from_number: string | null;
   status: MessageStatus;
   retry_count: number;
   error_message: string | null;
-  sent_at: Date | null;
-  delivered_at: Date | null;
-  read_at: Date | null;
   created_at: Date;
-  updated_at: Date;
+  sent_at: Date | null;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone_number: string;
+  email?: string | null;
+  tags?: string[] | null;
+  user_id: string;
+  created_at: Date;
 }
 
 export interface MessageTemplate {
   id: string;
   name: string;
   content: string;
-  variables: Record<string, string> | null;
+  variables?: Record<string, string> | null;
   user_id: string;
   created_at: Date;
-  updated_at: Date;
 }
 
 export interface AutoResponseRule {
@@ -101,63 +92,41 @@ export interface AutoResponseRule {
   keyword: string;
   response: string;
   device_id: string;
-  is_active: boolean;
   priority: number;
+  is_active: boolean;
   created_at: Date;
-  updated_at: Date;
-}
-
-export interface RateLimit {
-  id: string;
-  device_id: string;
-  messages_count: number;
-  window_start: Date;
-  window_end: Date;
-  is_limited: boolean;
-  created_at: Date;
-  updated_at: Date;
 }
 
 export interface ApiKey {
   id: string;
-  key_hash: string;
   name: string;
+  key_hash: string;
   user_id: string;
   is_active: boolean;
-  last_used: Date | null;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface MessageQueue {
-  id: string;
-  message_id: string;
-  device_id: string;
-  priority: number;
-  scheduled_at: Date;
-  processed_at: Date | null;
-  status: QueueStatus;
+  last_used?: Date | null;
   created_at: Date;
 }
 
 export interface AuditLog {
   id: string;
-  user_id: string | null;
+  user_id?: string;
   action: string;
   entity_type: string;
-  entity_id: string | null;
-  old_value: Record<string, any> | null;
-  new_value: Record<string, any> | null;
-  ip_address: string | null;
-  user_agent: string | null;
+  entity_id?: string;
+  old_value?: any;
+  new_value?: any;
+  ip_address?: string;
+  user_agent?: string;
   created_at: Date;
 }
 
-export interface CreateUserDTO {
-  email: string;
-  name: string;
-  role?: UserRole;
-  password: string;
+export interface DashboardStats {
+  total_devices: number;
+  active_devices: number;
+  total_messages_today: number;
+  success_rate: number;
+  total_messages_sent: number;
+  total_messages_failed: number;
 }
 
 export interface CreateDeviceDTO {
@@ -170,10 +139,11 @@ export interface CreateMessageDTO {
   device_id: string;
   user_id: string;
   to_number: string;
-  message: string;
+  message?: string;
+  media_path?: string;
+  media_type?: "image" | "video" | "audio" | "document";
 }
 
-// PERBAIKAN: Menambahkan type union | null agar sesuai dengan Zod validation
 export interface CreateContactDTO {
   name: string;
   phone_number: string;
@@ -183,21 +153,6 @@ export interface CreateContactDTO {
 }
 
 export interface DeviceViewModel extends Device {
-  user_name?: string;
   message_count?: number;
   last_message_at?: Date;
-}
-
-export interface MessageViewModel extends Message {
-  device_name?: string;
-  contact_name?: string;
-}
-
-export interface DashboardStats {
-  total_devices: number;
-  active_devices: number;
-  total_messages_today: number;
-  total_messages_sent: number;
-  total_messages_failed: number;
-  success_rate: number;
 }

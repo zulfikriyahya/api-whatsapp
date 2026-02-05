@@ -1,4 +1,3 @@
-// src/app/api/templates/[templateId]/route.ts
 import { NextRequest } from "next/server";
 import { TemplateQueries } from "@/lib/db/queries/template.queries";
 import { createTemplateSchema, validate } from "@/lib/validations/schemas";
@@ -19,7 +18,6 @@ type Params = {
   }>;
 };
 
-// FIX: Ubah request jadi _request
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);
@@ -45,7 +43,6 @@ export async function GET(_request: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(_request: NextRequest, { params }: Params) {
-  // PATCH tetap
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -78,7 +75,6 @@ export async function PATCH(_request: NextRequest, { params }: Params) {
   }
 }
 
-// FIX: Ubah request jadi _request
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);

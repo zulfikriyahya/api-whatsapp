@@ -44,7 +44,6 @@ export async function GET(_request: NextRequest) {
 
     const messages = await query<Message[]>(sql, params);
 
-    // Get total count for pagination
     let countSql = `
       SELECT COUNT(*) as total 
       FROM messages m

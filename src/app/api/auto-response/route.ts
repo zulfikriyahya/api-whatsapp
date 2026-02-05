@@ -1,4 +1,3 @@
-// src/app/api/auto-response/route.ts
 import { NextRequest } from "next/server";
 import { AutoResponseQueries } from "@/lib/db/queries/auto-response.queries";
 import { DeviceQueries } from "@/lib/db/queries/device.queries";
@@ -9,7 +8,7 @@ import {
   handleApiError,
   unauthorizedResponse,
   forbiddenResponse,
-  notFoundResponse, // PERBAIKAN: Ditambahkan ke import
+  notFoundResponse,
 } from "@/lib/utils/api-response";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
@@ -57,7 +56,6 @@ export async function POST(_request: NextRequest) {
 
     const validation = validate(createAutoResponseSchema, body);
     if (!validation.success) {
-      // validation.errors dijamin ada berkat perbaikan schema sebelumnya
       return validationErrorResponse(validation.errors);
     }
 

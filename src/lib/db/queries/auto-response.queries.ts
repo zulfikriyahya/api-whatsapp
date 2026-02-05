@@ -1,4 +1,3 @@
-// src/lib/db/queries/auto-response.queries.ts
 import { query, queryOne } from "../index";
 import { AutoResponseRule } from "@/types/database.types";
 import { v4 as uuidv4 } from "uuid";

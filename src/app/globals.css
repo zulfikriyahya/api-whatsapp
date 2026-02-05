@@ -81,7 +81,7 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/70 dark:bg-slate-950/70 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-lg;
+    @apply bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-lg supports-[backdrop-filter]:bg-white/60;
   }
 
   .glass-card {
@@ -90,5 +90,14 @@
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600 dark:from-blue-400 dark:to-violet-400;
+  }
+
+  /* Custom Scrollbar Hide */
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }

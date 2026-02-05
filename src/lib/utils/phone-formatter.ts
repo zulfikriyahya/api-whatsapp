@@ -1,6 +1,7 @@
-// src/lib/utils/phone-formatter.ts
-
 export class PhoneFormatter {
+  /**
+   * Formats a phone number for WhatsApp ID (e.g., 62812345678@c.us)
+   */
   static formatForWhatsApp(
     phoneNumber: string,
     countryCode: string = "62",
@@ -20,15 +21,24 @@ export class PhoneFormatter {
     return formatted;
   }
 
+  /**
+   * Validates minimal length for phone number
+   */
   static validate(phoneNumber: string): boolean {
     const cleaned = phoneNumber.replace(/\D/g, "");
     return cleaned.length >= 10 && cleaned.length <= 15;
   }
 
+  /**
+   * Removes non-numeric characters
+   */
   static normalize(phoneNumber: string): string {
     return phoneNumber.replace(/\D/g, "");
   }
 
+  /**
+   * Display format (International or Local)
+   */
   static format(
     phoneNumber: string,
     format: "international" | "local" = "international",

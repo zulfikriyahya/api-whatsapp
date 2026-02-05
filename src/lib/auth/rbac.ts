@@ -1,4 +1,3 @@
-// src/lib/auth/rbac.ts
 import { UserRole } from "@/types/database.types";
 
 export const ROLE_HIERARCHY: Record<UserRole, number> = {

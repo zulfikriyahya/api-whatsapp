@@ -1,20 +1,13 @@
-// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-
   serverExternalPackages: ["whatsapp-web.js", "mysql2", "puppeteer", "pdfkit"],
-
-  // PERBAIKAN: Disable eslint saat build agar tidak memblokir deployment
   eslint: {
     ignoreDuringBuilds: true,
   },
-
   typescript: {
-    // Opsional: jika masih ada error type sepele yang memblokir build
     ignoreBuildErrors: false,
   },
-
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -25,12 +18,10 @@ const nextConfig = {
       },
     ],
   },
-
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     APP_URL: process.env.NEXTAUTH_URL,
   },
-
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -43,28 +34,15 @@ const nextConfig = {
     }
     return config;
   },
-
   async headers() {
     return [
       {
         source: "/(.*)",
         headers: [
-          {
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "X-XSS-Protection",
-            value: "1; mode=block",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
@@ -73,16 +51,10 @@ const nextConfig = {
       },
       {
         source: "/api/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-store, must-revalidate",
-          },
-        ],
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
       },
     ];
   },
-
   async redirects() {
     return [
       {
@@ -92,14 +64,7 @@ const nextConfig = {
       },
     ];
   },
-
   output: "standalone",
-
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
-  },
 };
 
 module.exports = nextConfig;

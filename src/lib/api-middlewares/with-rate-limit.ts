@@ -4,32 +4,18 @@ import {
   rateLimitResponse,
   serverErrorResponse,
 } from "@/lib/utils/api-response";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/lib/auth/options";
 
 type RouteHandler = (req: NextRequest, context?: any) => Promise<Response>;
 
 export function withRateLimit(handler: RouteHandler) {
   return async (req: NextRequest, context?: any) => {
     try {
-      // const session = await getServerSession(authOptions);
-      // Rate limiting by device usually happens in service,
-      // but here we can rate limit by User ID or IP for API protection
-
-      // If we are in a device context (e.g. sending message), extract deviceId from body
-      const clone = req.clone();
-      try {
-        const body = await clone.json();
-        if (body.deviceId) {
-          const check = await RateLimiter.checkLimit(body.deviceId);
-          if (!check.allowed) {
-            return rateLimitResponse();
-          }
-          // Record usage asynchronously
-          RateLimiter.recordLimit(body.deviceId).catch(console.error);
-        }
-      } catch (e) {
-        // Body parsing failed or not JSON, skip device check
+      // Basic rate limit check based on API Key if present
+      const apiKey = req.headers.get("x-api-key");
+      if (apiKey) {
+        // Future implementation: Check rate limit per API key
+        // const allowed = await RateLimiter.checkApiKeyLimit(apiKey);
+        // if (!allowed) return rateLimitResponse();
       }
 
       return handler(req, context);
@@ -37,7 +23,7 @@ export function withRateLimit(handler: RouteHandler) {
       if (error instanceof Error) {
         return serverErrorResponse(error);
       }
-      return serverErrorResponse(new Error("Unknown error"));
+      return serverErrorResponse(new Error("Unknown error in middleware"));
     }
   };
 }

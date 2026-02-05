@@ -1,11 +1,8 @@
-// src/lib/whatsapp/message-queue.ts
 import { query, queryOne } from "../db";
 import { whatsappClientManager } from "./client-manager";
 import { MessageStatus } from "@/types/database.types";
 import { v4 as uuidv4 } from "uuid";
-import { appConfig } from "@/config/app.config";
 
-// Singleton Pattern
 const globalForQueue = global as unknown as {
   messageQueue: MessageQueue | undefined;
 };
@@ -35,22 +32,13 @@ class MessageQueue {
   private setupSignalHandlers() {
     if (process.env.NODE_ENV === "production") {
       const cleanup = () => {
-        console.log("Stopping queue processor...");
         this.stopProcessing();
       };
-
-      // Jangan timpa listener ClientManager, cukup tambahkan
       process.on("SIGTERM", cleanup);
       process.on("SIGINT", cleanup);
     }
   }
 
-  // ... (SISA KODE SAMA DENGAN SEBELUMNYA) ...
-  // Salin method addMessage, startProcessing, stopProcessing, processQueue,
-  // processMessage, handleFailure, removeFromQueue, checkRateLimit,
-  // incrementRateLimit, loadPendingMessages, getStatus, clearQueue dari file sebelumnya
-
-  // -- COPY PASTE LOGIC DISINI --
   async addMessage(
     messageId: string,
     deviceId: string,
@@ -75,7 +63,6 @@ class MessageQueue {
         b.priority - a.priority ||
         a.scheduledAt.getTime() - b.scheduledAt.getTime(),
     );
-    console.log(`✓ Message ${messageId} added to queue`);
   }
 
   private startProcessing() {
@@ -83,14 +70,12 @@ class MessageQueue {
     this.processingInterval = setInterval(async () => {
       if (!this.processing && this.queue.length > 0) await this.processQueue();
     }, 1000);
-    console.log("✓ Message queue processor started");
   }
 
   stopProcessing() {
     if (this.processingInterval) {
       clearInterval(this.processingInterval);
       this.processingInterval = null;
-      console.log("✓ Message queue processor stopped");
     }
   }
 
@@ -117,12 +102,6 @@ class MessageQueue {
 
   private async processMessage(item: QueueItem) {
     try {
-      const canSend = await this.checkRateLimit(item.deviceId);
-      if (!canSend) {
-        item.scheduledAt = new Date(Date.now() + 60000);
-        return;
-      }
-
       const message: any = await queryOne(
         "SELECT * FROM messages WHERE id = ?",
         [item.messageId],
@@ -146,6 +125,7 @@ class MessageQueue {
         message.to_number,
         message.message,
         item.messageId,
+        message.media_url || undefined,
       );
 
       if (result.success) {
@@ -154,8 +134,6 @@ class MessageQueue {
           `UPDATE message_queue SET status = 'COMPLETED' WHERE id = ?`,
           [item.id],
         );
-        await this.incrementRateLimit(item.deviceId);
-        console.log(`✓ Message ${item.messageId} sent`);
       } else {
         await this.handleFailure(item, result.error || "Unknown error");
       }
@@ -175,7 +153,6 @@ class MessageQueue {
         item.id,
       ]);
       await this.removeFromQueue(item.id);
-      console.log(`✗ Message ${item.messageId} failed`);
     } else {
       item.scheduledAt = new Date(Date.now() + this.retryDelay * item.retries);
       await query(
@@ -186,21 +163,11 @@ class MessageQueue {
         `UPDATE message_queue SET status = 'PENDING', scheduled_at = ? WHERE id = ?`,
         [item.scheduledAt, item.id],
       );
-      console.log(`⟳ Message ${item.messageId} rescheduled`);
     }
   }
 
   private async removeFromQueue(queueId: string) {
     this.queue = this.queue.filter((item) => item.id !== queueId);
-  }
-
-  private async checkRateLimit(deviceId: string) {
-    // Implementasi sederhana agar kode pendek, gunakan logic full dari file sebelumnya jika perlu akurasi tinggi
-    return true; // Simplified for brevity here, assume RateLimiter works
-  }
-
-  private async incrementRateLimit(deviceId: string) {
-    /* Logic sama */
   }
 
   async loadPendingMessages() {
@@ -217,7 +184,6 @@ class MessageQueue {
         retries: 0,
       });
     }
-    console.log(`✓ Loaded ${pending.length} pending messages`);
   }
 
   getStatus() {
@@ -228,20 +194,14 @@ class MessageQueue {
         .length,
     };
   }
-
-  async clearQueue() {
-    /* Logic sama */
-  }
 }
 
-// SINGLETON EXPORT
 export const messageQueue = globalForQueue.messageQueue || new MessageQueue();
 
 if (process.env.NODE_ENV !== "production") {
   globalForQueue.messageQueue = messageQueue;
 }
 
-// Jalankan load pending hanya sekali
 if (globalForQueue.messageQueue === undefined) {
   messageQueue.loadPendingMessages();
 }

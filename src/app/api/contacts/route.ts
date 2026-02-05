@@ -1,4 +1,3 @@
-// src/app/api/contacts/route.ts
 import { NextRequest } from "next/server";
 import { ContactService } from "@/lib/services/contact.service";
 import { createContactSchema, validate } from "@/lib/validations/schemas";
@@ -48,17 +47,15 @@ export async function POST(_request: NextRequest) {
 
     const body = await _request.json();
 
-    // Validasi menggunakan schema (expects: name, phoneNumber, tags, email)
     const validation = validate(createContactSchema, body);
 
     if (!validation.success) {
       return validationErrorResponse(validation.errors);
     }
 
-    // Mapping Data: Zod (camelCase) -> Service/DB (snake_case)
     const contact = await ContactService.createContact({
       name: validation.data.name,
-      phone_number: validation.data.phoneNumber, // Mapping penting di sini
+      phone_number: validation.data.phoneNumber,
       email: validation.data.email || null,
       tags: validation.data.tags || [],
       user_id: session.user.id,
@@ -86,7 +83,6 @@ export async function DELETE(_request: NextRequest) {
       ]);
     }
 
-    // TODO: Tambahkan validasi kepemilikan kontak sebelum hapus agar aman
     const deleted = await ContactService.deleteMultipleContacts(ids);
 
     return successResponse({ deleted });

@@ -1,4 +1,3 @@
-// src/app/api/webhooks/route.ts
 import { NextRequest } from "next/server";
 import { WebhookService } from "@/lib/services/webhook.service";
 import {
@@ -23,6 +22,14 @@ export async function POST(_request: NextRequest) {
       return validationErrorResponse([
         { field: "url", message: "Webhook URL is required" },
         { field: "events", message: "Events array is required" },
+      ]);
+    }
+
+    try {
+      new URL(body.url);
+    } catch {
+      return validationErrorResponse([
+        { field: "url", message: "Invalid URL format" },
       ]);
     }
 
