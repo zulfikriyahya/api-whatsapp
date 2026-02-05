@@ -1,6 +1,6 @@
 # PROJECT BLUEPRINT
 
-Generated: 6/2/2026, 01.41.52
+Generated: 6/2/2026, 02.01.58
 
 ## FRONTEND
 
@@ -6311,7 +6311,6 @@ API routes, database, services, authentication, middleware, and server-side logi
 ### Path: src/app/api/admin/stats/route.ts
 
 ```typescript
-// src/app/api/admin/stats/route.ts
 import { query, queryOne } from "@/lib/db";
 import {
   successResponse,
@@ -6323,7 +6322,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { UserRole } from "@/types/database.types";
 
-// Hapus parameter request
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -6335,42 +6333,38 @@ export async function GET() {
       return forbiddenResponse("Admin access required");
     }
 
-    const totalUsers: any = await queryOne(
-      "SELECT COUNT(*) as count FROM users",
-    );
-    const activeUsers: any = await queryOne(
-      "SELECT COUNT(*) as count FROM users WHERE is_active = true",
-    );
-    const totalDevices: any = await queryOne(
-      "SELECT COUNT(*) as count FROM devices",
-    );
-    const activeDevices: any = await queryOne(
-      "SELECT COUNT(*) as count FROM devices WHERE status = 'AUTHENTICATED' AND is_ready = true",
-    );
-    const totalMessages: any = await queryOne(
-      "SELECT COUNT(*) as count FROM messages",
-    );
-    const todayMessages: any = await queryOne(
-      "SELECT COUNT(*) as count FROM messages WHERE DATE(created_at) = CURDATE()",
-    );
-
-    const usersByRole = await query(`
-      SELECT role, COUNT(*) as count
-      FROM users
-      GROUP BY role
-    `);
-
-    const messagesByStatus = await query(`
-      SELECT status, COUNT(*) as count
-      FROM messages
-      GROUP BY status
-    `);
-
-    const devicesByStatus = await query(`
-      SELECT status, COUNT(*) as count
-      FROM devices
-      GROUP BY status
-    `);
+    const [
+      totalUsers,
+      activeUsers,
+      totalDevices,
+      activeDevices,
+      totalMessages,
+      todayMessages,
+      usersByRole,
+      messagesByStatus,
+      devicesByStatus,
+    ] = await Promise.all([
+      queryOne<{ count: number }>("SELECT COUNT(*) as count FROM users"),
+      queryOne<{ count: number }>(
+        "SELECT COUNT(*) as count FROM users WHERE is_active = true",
+      ),
+      queryOne<{ count: number }>("SELECT COUNT(*) as count FROM devices"),
+      queryOne<{ count: number }>(
+        "SELECT COUNT(*) as count FROM devices WHERE status = ? AND is_ready = true",
+        ["AUTHENTICATED"],
+      ),
+      queryOne<{ count: number }>("SELECT COUNT(*) as count FROM messages"),
+      queryOne<{ count: number }>(
+        "SELECT COUNT(*) as count FROM messages WHERE DATE(created_at) = CURDATE()",
+      ),
+      query<any[]>("SELECT role, COUNT(*) as count FROM users GROUP BY role"),
+      query<any[]>(
+        "SELECT status, COUNT(*) as count FROM messages GROUP BY status",
+      ),
+      query<any[]>(
+        "SELECT status, COUNT(*) as count FROM devices GROUP BY status",
+      ),
+    ]);
 
     return successResponse({
       users: {
@@ -9333,13 +9327,15 @@ class Database {
         password: appConfig.database.password,
         database: appConfig.database.database,
         waitForConnections: true,
-        connectionLimit: 10,
+        connectionLimit: 20,
+        maxIdle: 10,
+        idleTimeout: 60000,
         queueLimit: 0,
         enableKeepAlive: true,
-        keepAliveInitialDelay: 0,
+        keepAliveInitialDelay: 10000,
         timezone: "+00:00",
         multipleStatements: false,
-        namedPlaceholders: true,
+        namedPlaceholders: false,
       });
 
       (this.pool as any).on("error", (err: any) => {
@@ -9380,6 +9376,23 @@ class Database {
     return Array.isArray(rows) && rows.length > 0 ? (rows[0] as T) : null;
   }
 
+  public async transaction<T>(
+    callback: (connection: mysql.PoolConnection) => Promise<T>,
+  ): Promise<T> {
+    const connection = await this.getPool().getConnection();
+    await connection.beginTransaction();
+    try {
+      const result = await callback(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   public async close(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
@@ -9406,6 +9419,9 @@ export const queryOne = <T = any>(
   sql: string,
   params?: any[],
 ): Promise<T | null> => db.queryOne<T>(sql, params);
+export const transaction = <T>(
+  callback: (connection: mysql.PoolConnection) => Promise<T>,
+): Promise<T> => db.transaction(callback);
 export const closeDatabase = (): Promise<void> => db.close();
 export const healthCheck = (): Promise<boolean> => db.healthCheck();
 
@@ -10015,8 +10031,8 @@ export class DeviceQueries {
     const id = uuidv4();
     await query(
       `INSERT INTO devices (id, name, phone_number, user_id, status, is_ready)
-       VALUES (?, ?, ?, ?, 'DISCONNECTED', false)`,
-      [id, data.name, data.phone_number, data.user_id],
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, data.name, data.phone_number, data.user_id, "DISCONNECTED", false],
     );
     return (await this.findById(id))!;
   }
@@ -10038,7 +10054,8 @@ export class DeviceQueries {
 
   static async getActiveDevices(): Promise<Device[]> {
     return query<Device[]>(
-      "SELECT * FROM devices WHERE status = 'AUTHENTICATED' AND is_ready = true",
+      "SELECT * FROM devices WHERE status = ? AND is_ready = ?",
+      ["AUTHENTICATED", true],
     );
   }
 
@@ -10055,7 +10072,7 @@ export class DeviceQueries {
 ### Path: src/lib/db/queries/message.queries.ts
 
 ```typescript
-import { query, queryOne } from "../index";
+import { query, queryOne, transaction } from "../index";
 import type { Message, CreateMessageDTO } from "@/types/database.types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -10127,8 +10144,8 @@ export class MessageQueries {
 
   static async findPending(limit: number = 100): Promise<Message[]> {
     return query<Message[]>(
-      "SELECT * FROM messages WHERE status IN ('PENDING', 'QUEUED') ORDER BY created_at ASC LIMIT ?",
-      [limit],
+      "SELECT * FROM messages WHERE status IN (?, ?) ORDER BY created_at ASC LIMIT ?",
+      ["PENDING", "QUEUED", limit],
     );
   }
 
@@ -10136,15 +10153,23 @@ export class MessageQueries {
     const sql = `
       SELECT 
         COUNT(m.id) as total,
-        SUM(CASE WHEN m.status IN ('SENT', 'DELIVERED', 'READ') THEN 1 ELSE 0 END) as sent,
-        SUM(CASE WHEN m.status = 'FAILED' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN m.status IN ('PENDING', 'QUEUED') THEN 1 ELSE 0 END) as pending
+        SUM(CASE WHEN m.status IN (?, ?, ?) THEN 1 ELSE 0 END) as sent,
+        SUM(CASE WHEN m.status = ? THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN m.status IN (?, ?) THEN 1 ELSE 0 END) as pending
       FROM messages m
       JOIN devices d ON m.device_id = d.id
       WHERE d.user_id = ?
     `;
 
-    const res = await queryOne<any>(sql, [userId]);
+    const res = await queryOne<any>(sql, [
+      "SENT",
+      "DELIVERED",
+      "READ",
+      "FAILED",
+      "PENDING",
+      "QUEUED",
+      userId,
+    ]);
 
     return {
       total: Number(res?.total || 0),
@@ -10162,13 +10187,20 @@ export class MessageQueries {
     let sql = `
       SELECT 
         COUNT(id) as total,
-        SUM(CASE WHEN status IN ('SENT', 'DELIVERED', 'READ') THEN 1 ELSE 0 END) as sent,
-        SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN status IN ('PENDING', 'QUEUED') THEN 1 ELSE 0 END) as pending
+        SUM(CASE WHEN status IN (?, ?, ?) THEN 1 ELSE 0 END) as sent,
+        SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) as pending
       FROM messages
       WHERE 1=1
     `;
-    const queryParams: any[] = [];
+    const queryParams: any[] = [
+      "SENT",
+      "DELIVERED",
+      "READ",
+      "FAILED",
+      "PENDING",
+      "QUEUED",
+    ];
 
     if (params.deviceId) {
       sql += " AND device_id = ?";
@@ -10198,7 +10230,7 @@ export class MessageQueries {
     const id = uuidv4();
     await query(
       `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.device_id,
@@ -10207,6 +10239,8 @@ export class MessageQueries {
         data.message || "",
         data.media_path || null,
         data.media_type || null,
+        "PENDING",
+        0,
       ],
     );
     return (await this.findById(id))!;
@@ -10273,33 +10307,39 @@ export class MessageQueries {
   static async bulkCreate(messages: CreateMessageDTO[]): Promise<Message[]> {
     if (messages.length === 0) return [];
 
-    const values: any[] = [];
-    const placeholders: string[] = [];
+    return transaction(async (conn) => {
+      const values: any[] = [];
+      const placeholders: string[] = [];
+      const ids: string[] = [];
 
-    for (const data of messages) {
-      const id = uuidv4();
-      placeholders.push("(?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)");
-      values.push(
-        id,
-        data.device_id,
-        data.user_id,
-        data.to_number,
-        data.message || "",
-        data.media_path || null,
-        data.media_type || null,
+      for (const data of messages) {
+        const id = uuidv4();
+        ids.push(id);
+        placeholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        values.push(
+          id,
+          data.device_id,
+          data.user_id,
+          data.to_number,
+          data.message || "",
+          data.media_path || null,
+          data.media_type || null,
+          "PENDING",
+          0,
+        );
+      }
+
+      const sql = `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count) VALUES ${placeholders.join(", ")}`;
+      await conn.execute(sql, values);
+
+      const placeholderIds = ids.map(() => "?").join(",");
+      const [rows] = await conn.execute(
+        `SELECT * FROM messages WHERE id IN (${placeholderIds})`,
+        ids,
       );
-    }
 
-    const sql = `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count) VALUES ${placeholders.join(", ")}`;
-    await query(sql, values);
-
-    return query<Message[]>(
-      `SELECT * FROM messages WHERE id IN (${values
-        .filter((_, i) => i % 8 === 0)
-        .map(() => "?")
-        .join(",")})`,
-      values.filter((_, i) => i % 8 === 0),
-    );
+      return rows as Message[];
+    });
   }
 
   static async deleteOldMessages(days: number = 30): Promise<number> {
@@ -10541,10 +10581,53 @@ password=${appConfig.database.password}
 }
 ```
 
+### Path: src/lib/services/cache.service.ts
+
+```typescript
+import NodeCache from "node-cache";
+
+class CacheService {
+  private cache: NodeCache;
+
+  constructor() {
+    this.cache = new NodeCache({
+      stdTTL: 300,
+      checkperiod: 60,
+    });
+  }
+
+  get<T>(key: string): T | undefined {
+    return this.cache.get<T>(key);
+  }
+
+  set<T>(key: string, value: T, ttl?: number): boolean {
+    return this.cache.set(key, value, ttl || 300);
+  }
+
+  del(key: string): number {
+    return this.cache.del(key);
+  }
+
+  flush(): void {
+    this.cache.flushAll();
+  }
+
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+
+  keys(): string[] {
+    return this.cache.keys();
+  }
+}
+
+export const cacheService = new CacheService();
+```
+
 ### Path: src/lib/services/contact.service.ts
 
 ```typescript
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, transaction } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { Contact, CreateContactDTO } from "@/types/database.types";
 import { parse } from "csv-parse/sync";
@@ -10687,46 +10770,56 @@ export class ContactService {
     failed: number;
     errors: Array<{ row: number; error: string }>;
   }> {
-    const records = parse(csvContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
+    return transaction(async (conn) => {
+      const records = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
 
-    let imported = 0;
-    let failed = 0;
-    const errors: Array<{ row: number; error: string }> = [];
+      let imported = 0;
+      let failed = 0;
+      const errors: Array<{ row: number; error: string }> = [];
 
-    for (let i = 0; i < records.length; i++) {
-      const row = records[i];
-      const rowNumber = i + 2;
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
+        const rowNumber = i + 2;
 
-      try {
-        if (!row.name || !row.phone_number) {
-          throw new Error("Missing required fields: name or phone_number");
+        try {
+          if (!row.name || !row.phone_number) {
+            throw new Error("Missing required fields: name or phone_number");
+          }
+
+          const id = uuidv4();
+          await conn.execute(
+            `INSERT INTO contacts (id, name, phone_number, email, tags, user_id)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              row.name,
+              row.phone_number,
+              row.email || null,
+              row.tags
+                ? JSON.stringify(
+                    row.tags.split(",").map((t: string) => t.trim()),
+                  )
+                : null,
+              userId,
+            ],
+          );
+
+          imported++;
+        } catch (error: any) {
+          failed++;
+          errors.push({
+            row: rowNumber,
+            error: error.message,
+          });
         }
-
-        await this.createContact({
-          name: row.name,
-          phone_number: row.phone_number,
-          email: row.email || undefined,
-          tags: row.tags
-            ? row.tags.split(",").map((t: string) => t.trim())
-            : undefined,
-          user_id: userId,
-        });
-
-        imported++;
-      } catch (error: any) {
-        failed++;
-        errors.push({
-          row: rowNumber,
-          error: error.message,
-        });
       }
-    }
 
-    return { imported, failed, errors };
+      return { imported, failed, errors };
+    });
   }
 
   static async importFromVCF(
@@ -10737,47 +10830,57 @@ export class ContactService {
     failed: number;
     errors: Array<{ row: number; error: string }>;
   }> {
-    const cards = vcf.parse(vcfContent);
+    return transaction(async (conn) => {
+      const cards = vcf.parse(vcfContent);
 
-    let imported = 0;
-    let failed = 0;
-    const errors: Array<{ row: number; error: string }> = [];
+      let imported = 0;
+      let failed = 0;
+      const errors: Array<{ row: number; error: string }> = [];
 
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const rowNumber = i + 1;
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        const rowNumber = i + 1;
 
-      try {
-        const name = card.get("fn")?.valueOf() || "Unknown";
-        const tel = card.get("tel");
+        try {
+          const name = card.get("fn")?.valueOf() || "Unknown";
+          const tel = card.get("tel");
 
-        if (!tel) {
-          throw new Error("No phone number found");
+          if (!tel) {
+            throw new Error("No phone number found");
+          }
+
+          const phoneNumber =
+            typeof tel.valueOf() === "string"
+              ? tel.valueOf()
+              : tel.valueOf()[0];
+
+          const email = card.get("email")?.valueOf();
+
+          const id = uuidv4();
+          await conn.execute(
+            `INSERT INTO contacts (id, name, phone_number, email, user_id)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              id,
+              name,
+              phoneNumber,
+              typeof email === "string" ? email : null,
+              userId,
+            ],
+          );
+
+          imported++;
+        } catch (error: any) {
+          failed++;
+          errors.push({
+            row: rowNumber,
+            error: error.message,
+          });
         }
-
-        const phoneNumber =
-          typeof tel.valueOf() === "string" ? tel.valueOf() : tel.valueOf()[0];
-
-        const email = card.get("email")?.valueOf();
-
-        await this.createContact({
-          name,
-          phone_number: phoneNumber,
-          email: typeof email === "string" ? email : undefined,
-          user_id: userId,
-        });
-
-        imported++;
-      } catch (error: any) {
-        failed++;
-        errors.push({
-          row: rowNumber,
-          error: error.message,
-        });
       }
-    }
 
-    return { imported, failed, errors };
+      return { imported, failed, errors };
+    });
   }
 
   static async exportToCSV(userId: string): Promise<string> {
@@ -11007,12 +11110,16 @@ export const logDebug = (message: string, meta?: Record<string, any>) => {
 import { MessageQueries } from "../db/queries/message.queries";
 import { DeviceQueries } from "../db/queries/device.queries";
 import { messageQueue } from "../whatsapp/message-queue";
+import { transaction } from "../db";
 import type { CreateMessageDTO } from "@/types/database.types";
 
 export class MessageService {
   static async sendMessage(data: CreateMessageDTO) {
     const device = await DeviceQueries.findById(data.device_id);
     if (!device) throw new Error("Device not found");
+    if (device.status !== "AUTHENTICATED" || !device.is_ready) {
+      throw new Error("Device not ready");
+    }
 
     const message = await MessageQueries.create(data);
     await messageQueue.addMessage(message.id, data.device_id);
@@ -11027,39 +11134,47 @@ export class MessageService {
     deviceIds?: string[];
     useRoundRobin?: boolean;
   }) {
-    let devices = await DeviceQueries.findWithStats(params.userId);
-    devices = devices.filter((d) => d.status === "AUTHENTICATED" && d.is_ready);
+    return transaction(async (conn) => {
+      let devices = await DeviceQueries.findWithStats(params.userId);
+      devices = devices.filter(
+        (d) => d.status === "AUTHENTICATED" && d.is_ready,
+      );
 
-    if (devices.length === 0) throw new Error("No active devices found");
+      if (devices.length === 0) throw new Error("No active devices found");
 
-    if (params.deviceIds && params.deviceIds.length > 0) {
-      devices = devices.filter((d) => params.deviceIds!.includes(d.id));
-    }
-
-    if (devices.length === 0)
-      throw new Error("Selected devices are not active");
-
-    const results = [];
-    let deviceIndex = 0;
-
-    for (const contact of params.contacts) {
-      const device = devices[deviceIndex % devices.length];
-
-      const msg = await this.sendMessage({
-        device_id: device.id,
-        user_id: params.userId,
-        to_number: contact.phoneNumber,
-        message: params.message.replace("{{name}}", contact.name || ""),
-      });
-
-      results.push(msg);
-
-      if (params.useRoundRobin !== false) {
-        deviceIndex++;
+      if (params.deviceIds && params.deviceIds.length > 0) {
+        devices = devices.filter((d) => params.deviceIds!.includes(d.id));
       }
-    }
 
-    return { queued: results.length, total: params.contacts.length };
+      if (devices.length === 0)
+        throw new Error("Selected devices are not active");
+
+      const messages: CreateMessageDTO[] = [];
+      let deviceIndex = 0;
+
+      for (const contact of params.contacts) {
+        const device = devices[deviceIndex % devices.length];
+
+        messages.push({
+          device_id: device.id,
+          user_id: params.userId,
+          to_number: contact.phoneNumber,
+          message: params.message.replace("{{name}}", contact.name || ""),
+        });
+
+        if (params.useRoundRobin !== false) {
+          deviceIndex++;
+        }
+      }
+
+      const created = await MessageQueries.bulkCreate(messages);
+
+      for (const msg of created) {
+        await messageQueue.addMessage(msg.id, msg.device_id);
+      }
+
+      return { queued: created.length, total: params.contacts.length };
+    });
   }
 
   static async getUserStats(userId: string) {
@@ -11682,6 +11797,7 @@ export function paginatedResponse(
 
 export function handleApiError(error: any) {
   console.error("[API Error]", error);
+
   const message =
     error instanceof Error ? error.message : "Internal Server Error";
 
@@ -11691,8 +11807,10 @@ export function handleApiError(error: any) {
     return errorResponse(message, 401, "UNAUTHORIZED");
   if (message.toLowerCase().includes("forbidden"))
     return errorResponse(message, 403, "FORBIDDEN");
+  if (message.toLowerCase().includes("validation"))
+    return errorResponse(message, 422, "VALIDATION_ERROR");
 
-  return errorResponse(message, 500, "INTERNAL_ERROR");
+  return errorResponse("Internal Server Error", 500, "INTERNAL_ERROR");
 }
 
 export const unauthorizedResponse = (message: string = "Unauthorized") =>
@@ -11887,12 +12005,18 @@ export class RateLimiter {
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const oneHourAgo = new Date(now.getTime() - 3600000);
 
-    const minuteCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? 
-       AND created_at >= ?`,
-      [deviceId, oneMinuteAgo],
-    );
+    const [minuteCount, hourCount] = await Promise.all([
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneMinuteAgo],
+      ),
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneHourAgo],
+      ),
+    ]);
 
     if (minuteCount && minuteCount.count >= perMinute) {
       return {
@@ -11900,13 +12024,6 @@ export class RateLimiter {
         reason: `Rate limit exceeded: Max ${perMinute} messages per minute`,
       };
     }
-
-    const hourCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? 
-       AND created_at >= ?`,
-      [deviceId, oneHourAgo],
-    );
 
     if (hourCount && hourCount.count >= perHour) {
       return {
@@ -11926,17 +12043,18 @@ export class RateLimiter {
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const oneHourAgo = new Date(now.getTime() - 3600000);
 
-    const minuteCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? AND created_at >= ?`,
-      [deviceId, oneMinuteAgo],
-    );
-
-    const hourCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? AND created_at >= ?`,
-      [deviceId, oneHourAgo],
-    );
+    const [minuteCount, hourCount] = await Promise.all([
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneMinuteAgo],
+      ),
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneHourAgo],
+      ),
+    ]);
 
     return {
       lastMinute: minuteCount?.count || 0,
@@ -12876,6 +12994,38 @@ export function handleCors() {
 }
 ```
 
+### Path: src/lib/api-middlewares/with-audit.ts
+
+```typescript
+import { NextRequest } from "next/server";
+import { AuditLogQueries } from "@/lib/db/queries/audit-log.queries";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
+
+export function withAudit(
+  handler: (req: NextRequest) => Promise<Response>,
+  action: string,
+  entityType: string,
+) {
+  return async (req: NextRequest) => {
+    const session = await getServerSession(authOptions);
+    const response = await handler(req);
+
+    if (session?.user && response.ok) {
+      await AuditLogQueries.create({
+        user_id: session.user.id,
+        action,
+        entity_type: entityType,
+        ip_address: req.headers.get("x-forwarded-for") || req.ip || undefined,
+        user_agent: req.headers.get("user-agent") || undefined,
+      }).catch(console.error);
+    }
+
+    return response;
+  };
+}
+```
+
 ### Path: src/lib/api-middlewares/with-auth.ts
 
 ```typescript
@@ -12957,6 +13107,36 @@ export function withRateLimit(handler: RouteHandler) {
       }
       return serverErrorResponse(new Error("Unknown error in middleware"));
     }
+  };
+}
+```
+
+### Path: src/lib/api-middlewares/with-validation.ts
+
+```typescript
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { validationErrorResponse } from "@/lib/utils/api-response";
+
+export function withValidation<T>(schema: z.ZodSchema<T>) {
+  return (handler: (req: NextRequest, validated: T) => Promise<Response>) => {
+    return async (req: NextRequest) => {
+      try {
+        const body = await req.json();
+        const validated = schema.parse(body);
+        return handler(req, validated);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return validationErrorResponse(
+            error.errors.map((e) => ({
+              field: e.path.join("."),
+              message: e.message,
+            })),
+          );
+        }
+        throw error;
+      }
+    };
   };
 }
 ```
