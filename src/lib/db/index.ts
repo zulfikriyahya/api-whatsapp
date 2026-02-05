@@ -23,13 +23,15 @@ class Database {
         password: appConfig.database.password,
         database: appConfig.database.database,
         waitForConnections: true,
-        connectionLimit: 10,
+        connectionLimit: 20,
+        maxIdle: 10,
+        idleTimeout: 60000,
         queueLimit: 0,
         enableKeepAlive: true,
-        keepAliveInitialDelay: 0,
+        keepAliveInitialDelay: 10000,
         timezone: "+00:00",
         multipleStatements: false,
-        namedPlaceholders: true,
+        namedPlaceholders: false,
       });
 
       (this.pool as any).on("error", (err: any) => {
@@ -70,6 +72,23 @@ class Database {
     return Array.isArray(rows) && rows.length > 0 ? (rows[0] as T) : null;
   }
 
+  public async transaction<T>(
+    callback: (connection: mysql.PoolConnection) => Promise<T>,
+  ): Promise<T> {
+    const connection = await this.getPool().getConnection();
+    await connection.beginTransaction();
+    try {
+      const result = await callback(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   public async close(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
@@ -96,6 +115,9 @@ export const queryOne = <T = any>(
   sql: string,
   params?: any[],
 ): Promise<T | null> => db.queryOne<T>(sql, params);
+export const transaction = <T>(
+  callback: (connection: mysql.PoolConnection) => Promise<T>,
+): Promise<T> => db.transaction(callback);
 export const closeDatabase = (): Promise<void> => db.close();
 export const healthCheck = (): Promise<boolean> => db.healthCheck();
 

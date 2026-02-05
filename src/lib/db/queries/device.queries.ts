@@ -31,8 +31,8 @@ export class DeviceQueries {
     const id = uuidv4();
     await query(
       `INSERT INTO devices (id, name, phone_number, user_id, status, is_ready)
-       VALUES (?, ?, ?, ?, 'DISCONNECTED', false)`,
-      [id, data.name, data.phone_number, data.user_id],
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, data.name, data.phone_number, data.user_id, "DISCONNECTED", false],
     );
     return (await this.findById(id))!;
   }
@@ -54,7 +54,8 @@ export class DeviceQueries {
 
   static async getActiveDevices(): Promise<Device[]> {
     return query<Device[]>(
-      "SELECT * FROM devices WHERE status = 'AUTHENTICATED' AND is_ready = true",
+      "SELECT * FROM devices WHERE status = ? AND is_ready = ?",
+      ["AUTHENTICATED", true],
     );
   }
 

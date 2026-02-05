@@ -1,6 +1,6 @@
 # PROJECT BLUEPRINT
 
-Generated: 6/2/2026, 01.21.19
+Generated: 6/2/2026, 01.41.52
 
 ## FRONTEND
 
@@ -7270,10 +7270,10 @@ export async function GET(_request: NextRequest) {
 ### Path: src/app/api/chatbot/message/route.ts
 
 ```typescript
-// src/app/api/chatbot/message/route.ts
 import { NextRequest } from "next/server";
 import { MessageService } from "@/lib/services/message.service";
 import { ApiKeyQueries } from "@/lib/db/queries/api-key.queries";
+import { RateLimiter } from "@/lib/utils/rate-limiter";
 import {
   successResponse,
   validationErrorResponse,
@@ -7315,50 +7315,6 @@ export async function POST(_request: NextRequest) {
           field: "rateLimit",
           message: rateLimitCheck.reason || "Rate limit exceeded",
         },
-      ]);
-    }
-
-    const message = await MessageService.sendMessage({
-      device_id: body.deviceId,
-      user_id: apiKeyRecord.user_id,
-      to_number: body.toNumber,
-      message: body.message,
-    });
-
-    return successResponse({
-      messageId: message.id,
-      status: message.status,
-      queuedAt: message.created_at,
-    });
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function POST(_request: NextRequest) {
-  try {
-    const apiKey = _request.headers.get("x-api-key");
-
-    if (!apiKey) {
-      return unauthorizedResponse("API key is required");
-    }
-
-    const keyHash = ApiKeyQueries.hashApiKey(apiKey);
-    const apiKeyRecord = await ApiKeyQueries.findByHash(keyHash);
-
-    if (!apiKeyRecord || !apiKeyRecord.is_active) {
-      return unauthorizedResponse("Invalid or inactive API key");
-    }
-
-    await ApiKeyQueries.updateLastUsed(apiKeyRecord.id);
-
-    const body = await _request.json();
-
-    if (!body.deviceId || !body.toNumber || !body.message) {
-      return validationErrorResponse([
-        { field: "deviceId", message: "Device ID is required" },
-        { field: "toNumber", message: "Phone number is required" },
-        { field: "message", message: "Message is required" },
       ]);
     }
 
@@ -7682,34 +7638,29 @@ import {
 } from "@/lib/utils/api-response";
 import * as fs from "fs";
 import * as path from "path";
-import { StorageService } from "@/lib/services/storage.service";
 
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    // Gunakan Environment Variable untuk Secret Key
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return unauthorizedResponse();
     }
 
-    // 1. Hapus Pesan Lama (> 30 hari)
     const days = 30;
     const result: any = await query(
       `DELETE FROM messages WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`,
       [days],
     );
 
-    // 2. Hapus File Media Lama (Temp files)
     const uploadsDir = path.join(process.cwd(), "public", "uploads");
     let deletedFiles = 0;
 
-    // Helper rekursif untuk scan folder
     const scanAndDelete = (dir: string) => {
       if (!fs.existsSync(dir)) return;
 
       const files = fs.readdirSync(dir);
       const now = Date.now();
-      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 Hari
+      const maxAge = 7 * 24 * 60 * 60 * 1000;
 
       for (const file of files) {
         const filePath = path.join(dir, file);
@@ -7717,7 +7668,6 @@ export async function POST(req: NextRequest) {
 
         if (stats.isDirectory()) {
           scanAndDelete(filePath);
-          // Hapus direktori kosong
           if (fs.readdirSync(filePath).length === 0) {
             fs.rmdirSync(filePath);
           }
@@ -7732,14 +7682,12 @@ export async function POST(req: NextRequest) {
 
     scanAndDelete(uploadsDir);
 
-    // 3. Optimize Tables (Optional, good for MySQL/MariaDB)
     await query("OPTIMIZE TABLE messages, message_queue, audit_logs");
 
     return successResponse({
       message: "Cleanup completed",
       deletedMessages: result.affectedRows,
       deletedFiles,
-      note: "Old messages and temp files deleted.",
     });
   } catch (error) {
     return handleApiError(error);
@@ -7971,14 +7919,12 @@ export async function GET() {
 ### Path: src/app/api/health/route.ts
 
 ```typescript
-// src/app/api/health/route.ts
 import { NextRequest } from "next/server";
 import { healthCheck } from "@/lib/db";
 import { whatsappClientManager } from "@/lib/whatsapp/client-manager";
 import { messageQueue } from "@/lib/whatsapp/message-queue";
 import { successResponse, handleApiError } from "@/lib/utils/api-response";
 
-// PERBAIKAN: Ubah 'request' menjadi '_request'
 export async function GET(_request: NextRequest) {
   try {
     const dbHealthy = await healthCheck();
@@ -8003,6 +7949,11 @@ export async function GET(_request: NextRequest) {
           activeClients: activeClients.length,
           clients: activeClients,
         },
+      },
+      uptime: process.uptime(),
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
       },
     };
 
@@ -8333,7 +8284,8 @@ export async function POST(req: NextRequest) {
     }
 
     let mediaPath = undefined;
-    let mediaType = undefined;
+    let mediaType: "image" | "video" | "audio" | "document" | undefined =
+      undefined;
 
     if (body.media && body.media.size > 0) {
       if (body.media.type.startsWith("image/")) mediaType = "image";
@@ -8359,84 +8311,6 @@ export async function POST(req: NextRequest) {
     return handleApiError(error);
   }
 }
-
-// export async function POST(req: NextRequest) {
-//   try {
-//     const session = await getServerSession(authOptions);
-//     if (!session?.user) return unauthorizedResponse();
-
-//     let body: any = {};
-//     const contentType = req.headers.get("content-type") || "";
-
-//     if (contentType.includes("multipart/form-data")) {
-//       const formData = await req.formData();
-//       body = {
-//         deviceId: formData.get("deviceId") as string,
-//         toNumber: formData.get("toNumber") as string,
-//         message: formData.get("message") as string,
-//         media: formData.get("media") as File | null,
-//         useRoundRobin: formData.get("useRoundRobin") === "true",
-//         contacts: formData.get("contacts")
-//           ? JSON.parse(formData.get("contacts") as string)
-//           : undefined,
-//       };
-//     } else {
-//       body = await req.json();
-//     }
-
-//     // Bulk Send Logic
-//     if (body.contacts && Array.isArray(body.contacts)) {
-//       const result = await MessageService.sendBulkMessages({
-//         userId: session.user.id,
-//         contacts: body.contacts,
-//         message: body.message,
-//         deviceIds: body.deviceId ? [body.deviceId] : undefined,
-//         useRoundRobin: body.useRoundRobin || false,
-//       });
-//       return successResponse(result, { status: 201 });
-//     }
-
-//     // Single Message Logic
-//     if (!body.deviceId && !body.useRoundRobin) {
-//       const devices = await DeviceQueries.getActiveDevices();
-//       const userDevices = devices.filter((d) => d.user_id === session.user.id);
-//       if (userDevices.length > 0) {
-//         body.deviceId = userDevices[0].id;
-//       } else {
-//         return validationErrorResponse([
-//           { field: "deviceId", message: "No active device found" },
-//         ]);
-//       }
-//     }
-
-//     let mediaPath = undefined;
-//     let mediaType = undefined;
-
-//     if (body.media && body.media.size > 0) {
-//       if (body.media.type.startsWith("image/")) mediaType = "image";
-//       else if (body.media.type.startsWith("video/")) mediaType = "video";
-//       else if (body.media.type.startsWith("audio/")) mediaType = "audio";
-//       else mediaType = "document";
-
-//       const saved = await StorageService.saveFile(body.media, "messages");
-//       mediaPath = saved.path;
-//     }
-
-//     const result = await MessageService.sendMessage({
-//       user_id: session.user.id,
-//       device_id: body.deviceId,
-//       to_number: body.toNumber?.replace(/\D/g, "") || "",
-//       message: body.message || "",
-//       media_path: mediaPath,
-//       // @ts-ignore
-//       media_type: mediaType,
-//     });
-
-//     return successResponse(result, { status: 201 });
-//   } catch (error) {
-//     return handleApiError(error);
-//   }
-// }
 ```
 
 ### Path: src/app/api/reports/export/route.ts
@@ -10395,6 +10269,46 @@ export class MessageQueries {
       [deviceId, params.limit],
     );
   }
+
+  static async bulkCreate(messages: CreateMessageDTO[]): Promise<Message[]> {
+    if (messages.length === 0) return [];
+
+    const values: any[] = [];
+    const placeholders: string[] = [];
+
+    for (const data of messages) {
+      const id = uuidv4();
+      placeholders.push("(?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)");
+      values.push(
+        id,
+        data.device_id,
+        data.user_id,
+        data.to_number,
+        data.message || "",
+        data.media_path || null,
+        data.media_type || null,
+      );
+    }
+
+    const sql = `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count) VALUES ${placeholders.join(", ")}`;
+    await query(sql, values);
+
+    return query<Message[]>(
+      `SELECT * FROM messages WHERE id IN (${values
+        .filter((_, i) => i % 8 === 0)
+        .map(() => "?")
+        .join(",")})`,
+      values.filter((_, i) => i % 8 === 0),
+    );
+  }
+
+  static async deleteOldMessages(days: number = 30): Promise<number> {
+    const result: any = await query(
+      `DELETE FROM messages WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`,
+      [days],
+    );
+    return result.affectedRows || 0;
+  }
 }
 ```
 
@@ -10518,15 +10432,18 @@ export class BackupService {
     const filename = `backup_${timestamp}.sql`;
     const filepath = path.join(this.backupsDir, filename);
 
-    const command = `mysqldump -h ${appConfig.database.host} -P ${appConfig.database.port} -u ${appConfig.database.user} -p${appConfig.database.password} ${appConfig.database.database} > ${filepath}`;
+    const configFile = this.createMyCnfFile();
 
     try {
+      const command = `mysqldump --defaults-extra-file=${configFile} ${appConfig.database.database} > ${filepath}`;
       await execAsync(command);
       console.log(`Backup created: ${filepath}`);
       return filepath;
     } catch (error) {
       console.error("Backup failed:", error);
       throw new Error("Failed to create backup");
+    } finally {
+      this.cleanupMyCnfFile(configFile);
     }
   }
 
@@ -10535,18 +10452,39 @@ export class BackupService {
       throw new Error("Backup file not found");
     }
 
-    const command = `mysql -h ${appConfig.database.host} -P ${appConfig.database.port} -u ${appConfig.database.user} -p${appConfig.database.password} ${appConfig.database.database} < ${filepath}`;
+    const configFile = this.createMyCnfFile();
 
     try {
+      const command = `mysql --defaults-extra-file=${configFile} ${appConfig.database.database} < ${filepath}`;
       await execAsync(command);
       console.log(`Backup restored from: ${filepath}`);
     } catch (error) {
       console.error("Restore failed:", error);
       throw new Error("Failed to restore backup");
+    } finally {
+      this.cleanupMyCnfFile(configFile);
     }
   }
 
-  static async listBackups(): Promise<
+  private static createMyCnfFile(): string {
+    const configPath = path.join(this.backupsDir, `.my.cnf.${Date.now()}`);
+    const configContent = `[client]
+host=${appConfig.database.host}
+port=${appConfig.database.port}
+user=${appConfig.database.user}
+password=${appConfig.database.password}
+`;
+    fs.writeFileSync(configPath, configContent, { mode: 0o600 });
+    return configPath;
+  }
+
+  private static cleanupMyCnfFile(configPath: string): void {
+    if (fs.existsSync(configPath)) {
+      fs.unlinkSync(configPath);
+    }
+  }
+
+  static async listBackups(): Promise
     Array<{
       filename: string;
       filepath: string;
@@ -10995,8 +10933,15 @@ export class EmailService {
 ```typescript
 import winston from "winston";
 import { appConfig } from "@/config/app.config";
+import * as fs from "fs";
+import * as path from "path";
 
-const { combine, timestamp, json, colorize, printf } = winston.format;
+const logsDir = path.join(process.cwd(), "logs");
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const { combine, timestamp, json, colorize, printf, errors } = winston.format;
 
 const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
   let msg = `${timestamp} [${level}]: ${message}`;
@@ -11008,13 +10953,19 @@ const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
 
 export const logger = winston.createLogger({
   level: appConfig.isDevelopment ? "debug" : "info",
-  format: combine(timestamp(), json()),
+  format: combine(errors({ stack: true }), timestamp(), json()),
   transports: [
     new winston.transports.File({
-      filename: "logs/error.log",
+      filename: path.join(logsDir, "error.log"),
       level: "error",
+      maxsize: 5242880,
+      maxFiles: 5,
     }),
-    new winston.transports.File({ filename: "logs/combined.log" }),
+    new winston.transports.File({
+      filename: path.join(logsDir, "combined.log"),
+      maxsize: 5242880,
+      maxFiles: 5,
+    }),
   ],
 });
 
@@ -11035,6 +10986,18 @@ export const logError = (error: unknown, context?: string) => {
   } else {
     logger.error(String(error), { context });
   }
+};
+
+export const logInfo = (message: string, meta?: Record<string, any>) => {
+  logger.info(message, meta);
+};
+
+export const logWarning = (message: string, meta?: Record<string, any>) => {
+  logger.warn(message, meta);
+};
+
+export const logDebug = (message: string, meta?: Record<string, any>) => {
+  logger.debug(message, meta);
 };
 ```
 
@@ -11080,7 +11043,6 @@ export class MessageService {
     let deviceIndex = 0;
 
     for (const contact of params.contacts) {
-      // Round Robin Logic
       const device = devices[deviceIndex % devices.length];
 
       const msg = await this.sendMessage({
@@ -11092,7 +11054,6 @@ export class MessageService {
 
       results.push(msg);
 
-      // Only increment index if Round Robin is enabled, otherwise use first device
       if (params.useRoundRobin !== false) {
         deviceIndex++;
       }
@@ -11246,7 +11207,7 @@ export interface SystemSettings {
   retryDelayMs: number;
   sessionTimeout: number;
   autoBackupEnabled: boolean;
-  autoBackupInterval: number; // in seconds
+  autoBackupInterval: number;
 }
 
 export class SettingsService {
@@ -11256,9 +11217,9 @@ export class SettingsService {
     maxDevicesPerUser: 10,
     maxRetryAttempts: 3,
     retryDelayMs: 5000,
-    sessionTimeout: 2592000, // 30 days
+    sessionTimeout: 2592000,
     autoBackupEnabled: false,
-    autoBackupInterval: 86400, // 24 hours
+    autoBackupInterval: 86400,
   };
 
   static async getSystemSettings(): Promise<SystemSettings> {
@@ -11341,6 +11302,54 @@ export class SettingsService {
       await query(
         "INSERT INTO settings (id, user_id, setting_key, setting_value) VALUES (?, ?, 'user_preferences', ?)",
         [id, userId, JSON.stringify(updated)],
+      );
+    }
+  }
+
+  static async deleteUserSettings(userId: string): Promise<void> {
+    await query(
+      "DELETE FROM settings WHERE user_id = ? AND setting_key = 'user_preferences'",
+      [userId],
+    );
+  }
+
+  static async getSetting(key: string, userId?: string): Promise<any | null> {
+    const settings: any = await queryOne(
+      "SELECT setting_value FROM settings WHERE setting_key = ? AND user_id = ?",
+      [key, userId || null],
+    );
+
+    if (!settings) return null;
+
+    try {
+      return JSON.parse(settings.setting_value);
+    } catch {
+      return settings.setting_value;
+    }
+  }
+
+  static async setSetting(
+    key: string,
+    value: any,
+    userId?: string,
+  ): Promise<void> {
+    const existing: any = await queryOne(
+      "SELECT id FROM settings WHERE setting_key = ? AND user_id = ?",
+      [key, userId || null],
+    );
+
+    const jsonValue = JSON.stringify(value);
+
+    if (existing) {
+      await query(
+        "UPDATE settings SET setting_value = ?, updated_at = NOW() WHERE id = ?",
+        [jsonValue, existing.id],
+      );
+    } else {
+      const id = uuidv4();
+      await query(
+        "INSERT INTO settings (id, user_id, setting_key, setting_value) VALUES (?, ?, ?, ?)",
+        [id, userId || null, key, jsonValue],
       );
     }
   }
@@ -11435,6 +11444,7 @@ export class StorageService {
 import { query, queryOne } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
+import { logError, logInfo } from "./logger.service";
 
 interface Webhook {
   id: string;
@@ -11550,7 +11560,7 @@ export class WebhookService {
       this.sendWebhookRequest(webhook, event, payload),
     );
 
-    Promise.allSettled(promises);
+    await Promise.allSettled(promises);
   }
 
   private static async sendWebhookRequest(
@@ -11558,6 +11568,7 @@ export class WebhookService {
     event: string,
     payload: Record<string, any>,
   ): Promise<void> {
+    const webhookId = webhook.id.substring(0, 8);
     try {
       const timestamp = new Date().toISOString();
       const bodyData = {
@@ -11595,14 +11606,30 @@ export class WebhookService {
 
       clearTimeout(timeout);
 
-      if (!response.ok) {
-        console.warn(
-          `Webhook ${webhook.id} failed with status ${response.status}`,
+      if (response.ok) {
+        logInfo(`Webhook delivered successfully`, {
+          webhookId,
+          event,
+          status: response.status,
+        });
+      } else {
+        logError(
+          new Error(
+            `Webhook failed with status ${response.status}: ${await response.text()}`,
+          ),
+          `webhook-${webhookId}`,
         );
       }
-    } catch (error) {
-      console.error(`Webhook error for ${webhook.url}:`, error);
+    } catch (error: any) {
+      logError(error, `webhook-${webhookId}`);
     }
+  }
+
+  static async getWebhookLogs(
+    webhookId: string,
+    limit: number = 50,
+  ): Promise<any[]> {
+    return [];
   }
 }
 ```
@@ -11703,13 +11730,84 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
+### Path: src/lib/utils/error-handler.ts
+
+```typescript
+import { logError } from "@/lib/services/logger.service";
+
+export class AppError extends Error {
+  constructor(
+    public message: string,
+    public statusCode: number = 500,
+    public code: string = "INTERNAL_ERROR",
+    public details?: any,
+  ) {
+    super(message);
+    this.name = "AppError";
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string, details?: any) {
+    super(message, 422, "VALIDATION_ERROR", details);
+    this.name = "ValidationError";
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource: string) {
+    super(`${resource} not found`, 404, "NOT_FOUND");
+    this.name = "NotFoundError";
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor(message: string = "Unauthorized") {
+    super(message, 401, "UNAUTHORIZED");
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message: string = "Forbidden") {
+    super(message, 403, "FORBIDDEN");
+    this.name = "ForbiddenError";
+  }
+}
+
+export class RateLimitError extends AppError {
+  constructor(message: string = "Rate limit exceeded") {
+    super(message, 429, "RATE_LIMIT_EXCEEDED");
+    this.name = "RateLimitError";
+  }
+}
+
+export function handleError(error: unknown, context?: string): AppError {
+  if (error instanceof AppError) {
+    logError(error, context);
+    return error;
+  }
+
+  if (error instanceof Error) {
+    logError(error, context);
+    return new AppError(error.message, 500, "INTERNAL_ERROR");
+  }
+
+  const unknownError = new AppError(
+    "An unknown error occurred",
+    500,
+    "UNKNOWN_ERROR",
+  );
+  logError(unknownError, context);
+  return unknownError;
+}
+```
+
 ### Path: src/lib/utils/phone-formatter.ts
 
 ```typescript
 export class PhoneFormatter {
-  /**
-   * Formats a phone number for WhatsApp ID (e.g., 62812345678@c.us)
-   */
   static formatForWhatsApp(
     phoneNumber: string,
     countryCode: string = "62",
@@ -11722,6 +11820,8 @@ export class PhoneFormatter {
       formatted = countryCode + formatted;
     }
 
+    formatted = formatted.slice(0, 15);
+
     if (!formatted.endsWith("@c.us")) {
       formatted = `${formatted}@c.us`;
     }
@@ -11729,24 +11829,15 @@ export class PhoneFormatter {
     return formatted;
   }
 
-  /**
-   * Validates minimal length for phone number
-   */
   static validate(phoneNumber: string): boolean {
     const cleaned = phoneNumber.replace(/\D/g, "");
     return cleaned.length >= 10 && cleaned.length <= 15;
   }
 
-  /**
-   * Removes non-numeric characters
-   */
   static normalize(phoneNumber: string): string {
-    return phoneNumber.replace(/\D/g, "");
+    return phoneNumber.replace(/\D/g, "").slice(0, 15);
   }
 
-  /**
-   * Display format (International or Local)
-   */
   static format(
     phoneNumber: string,
     format: "international" | "local" = "international",
@@ -11766,6 +11857,10 @@ export class PhoneFormatter {
 
     return cleaned.startsWith("0") ? cleaned : `0${cleaned}`;
   }
+
+  static sanitize(phoneNumber: string): string {
+    return this.normalize(phoneNumber);
+  }
 }
 ```
 
@@ -11775,12 +11870,19 @@ export class PhoneFormatter {
 import { queryOne } from "@/lib/db";
 import { appConfig } from "@/config/app.config";
 
+interface RateLimitConfig {
+  perMinute?: number;
+  perHour?: number;
+}
+
 export class RateLimiter {
   static async checkLimit(
     deviceId: string,
-    perMinute: number = appConfig.rateLimit.perMinute,
-    perHour: number = appConfig.rateLimit.perHour,
+    config?: RateLimitConfig,
   ): Promise<{ allowed: boolean; reason?: string }> {
+    const perMinute = config?.perMinute || appConfig.rateLimit.perMinute;
+    const perHour = config?.perHour || appConfig.rateLimit.perHour;
+
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const oneHourAgo = new Date(now.getTime() - 3600000);
@@ -11792,7 +11894,7 @@ export class RateLimiter {
       [deviceId, oneMinuteAgo],
     );
 
-    if (minuteCount.count >= perMinute) {
+    if (minuteCount && minuteCount.count >= perMinute) {
       return {
         allowed: false,
         reason: `Rate limit exceeded: Max ${perMinute} messages per minute`,
@@ -11806,7 +11908,7 @@ export class RateLimiter {
       [deviceId, oneHourAgo],
     );
 
-    if (hourCount.count >= perHour) {
+    if (hourCount && hourCount.count >= perHour) {
       return {
         allowed: false,
         reason: `Rate limit exceeded: Max ${perHour} messages per hour`,
@@ -11816,8 +11918,30 @@ export class RateLimiter {
     return { allowed: true };
   }
 
-  static async recordLimit(_deviceId: string): Promise<void> {
-    // Placeholder for future implementation (e.g. Redis counter)
+  static async getUsage(deviceId: string): Promise<{
+    lastMinute: number;
+    lastHour: number;
+  }> {
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60000);
+    const oneHourAgo = new Date(now.getTime() - 3600000);
+
+    const minuteCount: any = await queryOne(
+      `SELECT COUNT(*) as count FROM messages
+       WHERE device_id = ? AND created_at >= ?`,
+      [deviceId, oneMinuteAgo],
+    );
+
+    const hourCount: any = await queryOne(
+      `SELECT COUNT(*) as count FROM messages
+       WHERE device_id = ? AND created_at >= ?`,
+      [deviceId, oneHourAgo],
+    );
+
+    return {
+      lastMinute: minuteCount?.count || 0,
+      lastHour: hourCount?.count || 0,
+    };
   }
 }
 ```
@@ -11918,7 +12042,10 @@ export const phoneNumberSchema = z
     if (cleaned.startsWith("0")) {
       cleaned = "62" + cleaned.substring(1);
     }
-    return cleaned;
+    if (!cleaned.startsWith("62")) {
+      cleaned = "62" + cleaned;
+    }
+    return cleaned.slice(0, 15);
   });
 
 export const createDeviceSchema = z.object({
@@ -11943,7 +12070,8 @@ export const sendBulkMessageSchema = z.object({
         name: z.string().optional(),
       }),
     )
-    .min(1, "Minimal 1 kontak tujuan"),
+    .min(1, "Minimal 1 kontak tujuan")
+    .max(1000, "Maksimal 1000 kontak per batch"),
   useRoundRobin: z.boolean().default(true),
 });
 
@@ -11984,10 +12112,10 @@ export const updateWebhookSchema = z.object({
 export function validate<T>(schema: z.ZodSchema<T>, data: unknown) {
   const result = schema.safeParse(data);
   if (result.success) {
-    return { success: true, data: result.data };
+    return { success: true as const, data: result.data };
   }
   return {
-    success: false,
+    success: false as const,
     errors: result.error.errors.map((e) => ({
       field: e.path.join("."),
       message: e.message,
@@ -12036,35 +12164,6 @@ export class WhatsAppClientManager {
     this.setupSignalHandlers();
   }
 
-  async checkNumber(
-    deviceId: string,
-    phoneNumber: string,
-  ): Promise<{
-    registered: boolean;
-    formattedNumber?: string;
-    error?: string;
-  }> {
-    const instance = this.clients.get(deviceId);
-    if (!instance?.client) {
-      return { registered: false, error: "Device not ready" };
-    }
-
-    if (instance.status !== DeviceStatus.AUTHENTICATED) {
-      return { registered: false, error: "Device not authenticated" };
-    }
-
-    try {
-      const formatted = this.formatPhoneNumber(phoneNumber);
-      const isRegistered = await instance.client.isRegisteredUser(formatted);
-      return {
-        registered: isRegistered,
-        formattedNumber: formatted.replace("@c.us", ""),
-      };
-    } catch (error: any) {
-      console.error("Error checking number:", error);
-      return { registered: false, error: error.message };
-    }
-  }
   private ensureSessionDirectory(): void {
     if (!fs.existsSync(this.sessionPath)) {
       fs.mkdirSync(this.sessionPath, { recursive: true });
@@ -12442,6 +12541,10 @@ export class WhatsAppClientManager {
       return { registered: false, error: "Device not ready" };
     }
 
+    if (instance.status !== DeviceStatus.AUTHENTICATED) {
+      return { registered: false, error: "Device not authenticated" };
+    }
+
     try {
       const formatted = this.formatPhoneNumber(phoneNumber);
       const isRegistered = await instance.client.isRegisteredUser(formatted);
@@ -12513,7 +12616,7 @@ export class WhatsAppClientManager {
             const timeSinceActivity =
               now.getTime() - instance.lastActivity.getTime();
             if (timeSinceActivity > staleThreshold) {
-              // Log stale clients
+              console.log(`[Health Check] Stale client detected: ${deviceId}`);
             }
           }
         }
@@ -12559,6 +12662,7 @@ class MessageQueue {
   private readonly maxConcurrent = 3;
   private readonly retryDelay = parseInt(process.env.RETRY_DELAY_MS || "5000");
   private readonly maxRetries = parseInt(process.env.MAX_RETRY_ATTEMPTS || "3");
+  private readonly maxQueueSize = 10000;
 
   constructor() {
     this.loadPendingMessages();
@@ -12569,7 +12673,8 @@ class MessageQueue {
   async loadPendingMessages() {
     try {
       const pending: any[] = await query(
-        `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC`,
+        `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC LIMIT ?`,
+        [this.maxQueueSize],
       );
       for (const item of pending) {
         this.queue.push({
@@ -12603,6 +12708,10 @@ class MessageQueue {
     priority: number = 0,
     scheduledAt: Date = new Date(),
   ) {
+    if (this.queue.length >= this.maxQueueSize) {
+      throw new Error("Queue is full");
+    }
+
     const queueId = uuidv4();
     await query(
       `INSERT INTO message_queue (id, message_id, device_id, priority, scheduled_at, status) VALUES (?, ?, ?, ?, ?, 'PENDING')`,
@@ -12728,22 +12837,6 @@ class MessageQueue {
     this.queue = this.queue.filter((item) => item.id !== queueId);
   }
 
-  async loadPendingMessages() {
-    const pending: any[] = await query(
-      `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC`,
-    );
-    for (const item of pending) {
-      this.queue.push({
-        id: item.id,
-        messageId: item.message_id,
-        deviceId: item.device_id,
-        priority: item.priority,
-        scheduledAt: new Date(item.scheduled_at),
-        retries: 0,
-      });
-    }
-  }
-
   getStatus() {
     return {
       queueSize: this.queue.length,
@@ -12780,6 +12873,57 @@ export function corsHeaders() {
 
 export function handleCors() {
   return NextResponse.json({}, { headers: corsHeaders() });
+}
+```
+
+### Path: src/lib/api-middlewares/with-auth.ts
+
+```typescript
+import { NextRequest } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
+import {
+  unauthorizedResponse,
+  forbiddenResponse,
+  serverErrorResponse,
+} from "@/lib/utils/api-response";
+import { UserRole } from "@/types/database.types";
+
+type RouteHandler = (req: NextRequest, context?: any) => Promise<Response>;
+
+interface AuthOptions {
+  requiredRole?: UserRole;
+  allowedRoles?: UserRole[];
+}
+
+export function withAuth(handler: RouteHandler, options?: AuthOptions) {
+  return async (req: NextRequest, context?: any) => {
+    try {
+      const session = await getServerSession(authOptions);
+
+      if (!session?.user) {
+        return unauthorizedResponse();
+      }
+
+      if (options?.requiredRole && session.user.role !== options.requiredRole) {
+        return forbiddenResponse("Insufficient permissions");
+      }
+
+      if (
+        options?.allowedRoles &&
+        !options.allowedRoles.includes(session.user.role as UserRole)
+      ) {
+        return forbiddenResponse("Insufficient permissions");
+      }
+
+      return handler(req, context);
+    } catch (error) {
+      if (error instanceof Error) {
+        return serverErrorResponse(error);
+      }
+      return serverErrorResponse(new Error("Unknown error in auth middleware"));
+    }
+  };
 }
 ```
 
@@ -13614,4 +13758,28 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX IF NOT EXISTS idx_messages_device_status_created
+  ON messages(device_id, status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_message_queue_priority_status
+  ON message_queue(priority DESC, status, scheduled_at);
+
+CREATE INDEX IF NOT EXISTS idx_messages_user_created
+  ON messages(user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_devices_user_status
+  ON devices(user_id, status, is_ready);
+
+CREATE INDEX IF NOT EXISTS idx_contacts_user_phone
+  ON contacts(user_id, phone_number);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_active
+  ON api_keys(user_id, is_active);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_created
+  ON audit_logs(user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_webhooks_user_active
+  ON webhooks(user_id, is_active);
 ```

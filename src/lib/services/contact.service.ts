@@ -1,4 +1,4 @@
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, transaction } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { Contact, CreateContactDTO } from "@/types/database.types";
 import { parse } from "csv-parse/sync";
@@ -141,46 +141,56 @@ export class ContactService {
     failed: number;
     errors: Array<{ row: number; error: string }>;
   }> {
-    const records = parse(csvContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
+    return transaction(async (conn) => {
+      const records = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
 
-    let imported = 0;
-    let failed = 0;
-    const errors: Array<{ row: number; error: string }> = [];
+      let imported = 0;
+      let failed = 0;
+      const errors: Array<{ row: number; error: string }> = [];
 
-    for (let i = 0; i < records.length; i++) {
-      const row = records[i];
-      const rowNumber = i + 2;
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
+        const rowNumber = i + 2;
 
-      try {
-        if (!row.name || !row.phone_number) {
-          throw new Error("Missing required fields: name or phone_number");
+        try {
+          if (!row.name || !row.phone_number) {
+            throw new Error("Missing required fields: name or phone_number");
+          }
+
+          const id = uuidv4();
+          await conn.execute(
+            `INSERT INTO contacts (id, name, phone_number, email, tags, user_id)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              row.name,
+              row.phone_number,
+              row.email || null,
+              row.tags
+                ? JSON.stringify(
+                    row.tags.split(",").map((t: string) => t.trim()),
+                  )
+                : null,
+              userId,
+            ],
+          );
+
+          imported++;
+        } catch (error: any) {
+          failed++;
+          errors.push({
+            row: rowNumber,
+            error: error.message,
+          });
         }
-
-        await this.createContact({
-          name: row.name,
-          phone_number: row.phone_number,
-          email: row.email || undefined,
-          tags: row.tags
-            ? row.tags.split(",").map((t: string) => t.trim())
-            : undefined,
-          user_id: userId,
-        });
-
-        imported++;
-      } catch (error: any) {
-        failed++;
-        errors.push({
-          row: rowNumber,
-          error: error.message,
-        });
       }
-    }
 
-    return { imported, failed, errors };
+      return { imported, failed, errors };
+    });
   }
 
   static async importFromVCF(
@@ -191,47 +201,57 @@ export class ContactService {
     failed: number;
     errors: Array<{ row: number; error: string }>;
   }> {
-    const cards = vcf.parse(vcfContent);
+    return transaction(async (conn) => {
+      const cards = vcf.parse(vcfContent);
 
-    let imported = 0;
-    let failed = 0;
-    const errors: Array<{ row: number; error: string }> = [];
+      let imported = 0;
+      let failed = 0;
+      const errors: Array<{ row: number; error: string }> = [];
 
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const rowNumber = i + 1;
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        const rowNumber = i + 1;
 
-      try {
-        const name = card.get("fn")?.valueOf() || "Unknown";
-        const tel = card.get("tel");
+        try {
+          const name = card.get("fn")?.valueOf() || "Unknown";
+          const tel = card.get("tel");
 
-        if (!tel) {
-          throw new Error("No phone number found");
+          if (!tel) {
+            throw new Error("No phone number found");
+          }
+
+          const phoneNumber =
+            typeof tel.valueOf() === "string"
+              ? tel.valueOf()
+              : tel.valueOf()[0];
+
+          const email = card.get("email")?.valueOf();
+
+          const id = uuidv4();
+          await conn.execute(
+            `INSERT INTO contacts (id, name, phone_number, email, user_id)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              id,
+              name,
+              phoneNumber,
+              typeof email === "string" ? email : null,
+              userId,
+            ],
+          );
+
+          imported++;
+        } catch (error: any) {
+          failed++;
+          errors.push({
+            row: rowNumber,
+            error: error.message,
+          });
         }
-
-        const phoneNumber =
-          typeof tel.valueOf() === "string" ? tel.valueOf() : tel.valueOf()[0];
-
-        const email = card.get("email")?.valueOf();
-
-        await this.createContact({
-          name,
-          phone_number: phoneNumber,
-          email: typeof email === "string" ? email : undefined,
-          user_id: userId,
-        });
-
-        imported++;
-      } catch (error: any) {
-        failed++;
-        errors.push({
-          row: rowNumber,
-          error: error.message,
-        });
       }
-    }
 
-    return { imported, failed, errors };
+      return { imported, failed, errors };
+    });
   }
 
   static async exportToCSV(userId: string): Promise<string> {

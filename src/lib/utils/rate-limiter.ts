@@ -18,12 +18,18 @@ export class RateLimiter {
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const oneHourAgo = new Date(now.getTime() - 3600000);
 
-    const minuteCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? 
-       AND created_at >= ?`,
-      [deviceId, oneMinuteAgo],
-    );
+    const [minuteCount, hourCount] = await Promise.all([
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneMinuteAgo],
+      ),
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneHourAgo],
+      ),
+    ]);
 
     if (minuteCount && minuteCount.count >= perMinute) {
       return {
@@ -31,13 +37,6 @@ export class RateLimiter {
         reason: `Rate limit exceeded: Max ${perMinute} messages per minute`,
       };
     }
-
-    const hourCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? 
-       AND created_at >= ?`,
-      [deviceId, oneHourAgo],
-    );
 
     if (hourCount && hourCount.count >= perHour) {
       return {
@@ -57,17 +56,18 @@ export class RateLimiter {
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const oneHourAgo = new Date(now.getTime() - 3600000);
 
-    const minuteCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? AND created_at >= ?`,
-      [deviceId, oneMinuteAgo],
-    );
-
-    const hourCount: any = await queryOne(
-      `SELECT COUNT(*) as count FROM messages
-       WHERE device_id = ? AND created_at >= ?`,
-      [deviceId, oneHourAgo],
-    );
+    const [minuteCount, hourCount] = await Promise.all([
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneMinuteAgo],
+      ),
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages
+         WHERE device_id = ? AND created_at >= ?`,
+        [deviceId, oneHourAgo],
+      ),
+    ]);
 
     return {
       lastMinute: minuteCount?.count || 0,

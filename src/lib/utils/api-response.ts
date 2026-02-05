@@ -43,6 +43,7 @@ export function paginatedResponse(
 
 export function handleApiError(error: any) {
   console.error("[API Error]", error);
+
   const message =
     error instanceof Error ? error.message : "Internal Server Error";
 
@@ -52,8 +53,10 @@ export function handleApiError(error: any) {
     return errorResponse(message, 401, "UNAUTHORIZED");
   if (message.toLowerCase().includes("forbidden"))
     return errorResponse(message, 403, "FORBIDDEN");
+  if (message.toLowerCase().includes("validation"))
+    return errorResponse(message, 422, "VALIDATION_ERROR");
 
-  return errorResponse(message, 500, "INTERNAL_ERROR");
+  return errorResponse("Internal Server Error", 500, "INTERNAL_ERROR");
 }
 
 export const unauthorizedResponse = (message: string = "Unauthorized") =>

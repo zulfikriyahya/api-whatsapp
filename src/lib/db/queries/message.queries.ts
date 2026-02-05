@@ -1,4 +1,4 @@
-import { query, queryOne } from "../index";
+import { query, queryOne, transaction } from "../index";
 import type { Message, CreateMessageDTO } from "@/types/database.types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -70,8 +70,8 @@ export class MessageQueries {
 
   static async findPending(limit: number = 100): Promise<Message[]> {
     return query<Message[]>(
-      "SELECT * FROM messages WHERE status IN ('PENDING', 'QUEUED') ORDER BY created_at ASC LIMIT ?",
-      [limit],
+      "SELECT * FROM messages WHERE status IN (?, ?) ORDER BY created_at ASC LIMIT ?",
+      ["PENDING", "QUEUED", limit],
     );
   }
 
@@ -79,15 +79,23 @@ export class MessageQueries {
     const sql = `
       SELECT 
         COUNT(m.id) as total,
-        SUM(CASE WHEN m.status IN ('SENT', 'DELIVERED', 'READ') THEN 1 ELSE 0 END) as sent,
-        SUM(CASE WHEN m.status = 'FAILED' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN m.status IN ('PENDING', 'QUEUED') THEN 1 ELSE 0 END) as pending
+        SUM(CASE WHEN m.status IN (?, ?, ?) THEN 1 ELSE 0 END) as sent,
+        SUM(CASE WHEN m.status = ? THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN m.status IN (?, ?) THEN 1 ELSE 0 END) as pending
       FROM messages m
       JOIN devices d ON m.device_id = d.id
       WHERE d.user_id = ?
     `;
 
-    const res = await queryOne<any>(sql, [userId]);
+    const res = await queryOne<any>(sql, [
+      "SENT",
+      "DELIVERED",
+      "READ",
+      "FAILED",
+      "PENDING",
+      "QUEUED",
+      userId,
+    ]);
 
     return {
       total: Number(res?.total || 0),
@@ -105,13 +113,20 @@ export class MessageQueries {
     let sql = `
       SELECT 
         COUNT(id) as total,
-        SUM(CASE WHEN status IN ('SENT', 'DELIVERED', 'READ') THEN 1 ELSE 0 END) as sent,
-        SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN status IN ('PENDING', 'QUEUED') THEN 1 ELSE 0 END) as pending
+        SUM(CASE WHEN status IN (?, ?, ?) THEN 1 ELSE 0 END) as sent,
+        SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) as pending
       FROM messages
       WHERE 1=1
     `;
-    const queryParams: any[] = [];
+    const queryParams: any[] = [
+      "SENT",
+      "DELIVERED",
+      "READ",
+      "FAILED",
+      "PENDING",
+      "QUEUED",
+    ];
 
     if (params.deviceId) {
       sql += " AND device_id = ?";
@@ -141,7 +156,7 @@ export class MessageQueries {
     const id = uuidv4();
     await query(
       `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.device_id,
@@ -150,6 +165,8 @@ export class MessageQueries {
         data.message || "",
         data.media_path || null,
         data.media_type || null,
+        "PENDING",
+        0,
       ],
     );
     return (await this.findById(id))!;
@@ -216,33 +233,39 @@ export class MessageQueries {
   static async bulkCreate(messages: CreateMessageDTO[]): Promise<Message[]> {
     if (messages.length === 0) return [];
 
-    const values: any[] = [];
-    const placeholders: string[] = [];
+    return transaction(async (conn) => {
+      const values: any[] = [];
+      const placeholders: string[] = [];
+      const ids: string[] = [];
 
-    for (const data of messages) {
-      const id = uuidv4();
-      placeholders.push("(?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)");
-      values.push(
-        id,
-        data.device_id,
-        data.user_id,
-        data.to_number,
-        data.message || "",
-        data.media_path || null,
-        data.media_type || null,
+      for (const data of messages) {
+        const id = uuidv4();
+        ids.push(id);
+        placeholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        values.push(
+          id,
+          data.device_id,
+          data.user_id,
+          data.to_number,
+          data.message || "",
+          data.media_path || null,
+          data.media_type || null,
+          "PENDING",
+          0,
+        );
+      }
+
+      const sql = `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count) VALUES ${placeholders.join(", ")}`;
+      await conn.execute(sql, values);
+
+      const placeholderIds = ids.map(() => "?").join(",");
+      const [rows] = await conn.execute(
+        `SELECT * FROM messages WHERE id IN (${placeholderIds})`,
+        ids,
       );
-    }
 
-    const sql = `INSERT INTO messages (id, device_id, user_id, to_number, message, media_url, media_type, status, retry_count) VALUES ${placeholders.join(", ")}`;
-    await query(sql, values);
-
-    return query<Message[]>(
-      `SELECT * FROM messages WHERE id IN (${values
-        .filter((_, i) => i % 8 === 0)
-        .map(() => "?")
-        .join(",")})`,
-      values.filter((_, i) => i % 8 === 0),
-    );
+      return rows as Message[];
+    });
   }
 
   static async deleteOldMessages(days: number = 30): Promise<number> {

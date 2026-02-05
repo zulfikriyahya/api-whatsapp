@@ -1,12 +1,16 @@
 import { MessageQueries } from "../db/queries/message.queries";
 import { DeviceQueries } from "../db/queries/device.queries";
 import { messageQueue } from "../whatsapp/message-queue";
+import { transaction } from "../db";
 import type { CreateMessageDTO } from "@/types/database.types";
 
 export class MessageService {
   static async sendMessage(data: CreateMessageDTO) {
     const device = await DeviceQueries.findById(data.device_id);
     if (!device) throw new Error("Device not found");
+    if (device.status !== "AUTHENTICATED" || !device.is_ready) {
+      throw new Error("Device not ready");
+    }
 
     const message = await MessageQueries.create(data);
     await messageQueue.addMessage(message.id, data.device_id);
@@ -21,39 +25,47 @@ export class MessageService {
     deviceIds?: string[];
     useRoundRobin?: boolean;
   }) {
-    let devices = await DeviceQueries.findWithStats(params.userId);
-    devices = devices.filter((d) => d.status === "AUTHENTICATED" && d.is_ready);
+    return transaction(async (conn) => {
+      let devices = await DeviceQueries.findWithStats(params.userId);
+      devices = devices.filter(
+        (d) => d.status === "AUTHENTICATED" && d.is_ready,
+      );
 
-    if (devices.length === 0) throw new Error("No active devices found");
+      if (devices.length === 0) throw new Error("No active devices found");
 
-    if (params.deviceIds && params.deviceIds.length > 0) {
-      devices = devices.filter((d) => params.deviceIds!.includes(d.id));
-    }
-
-    if (devices.length === 0)
-      throw new Error("Selected devices are not active");
-
-    const results = [];
-    let deviceIndex = 0;
-
-    for (const contact of params.contacts) {
-      const device = devices[deviceIndex % devices.length];
-
-      const msg = await this.sendMessage({
-        device_id: device.id,
-        user_id: params.userId,
-        to_number: contact.phoneNumber,
-        message: params.message.replace("{{name}}", contact.name || ""),
-      });
-
-      results.push(msg);
-
-      if (params.useRoundRobin !== false) {
-        deviceIndex++;
+      if (params.deviceIds && params.deviceIds.length > 0) {
+        devices = devices.filter((d) => params.deviceIds!.includes(d.id));
       }
-    }
 
-    return { queued: results.length, total: params.contacts.length };
+      if (devices.length === 0)
+        throw new Error("Selected devices are not active");
+
+      const messages: CreateMessageDTO[] = [];
+      let deviceIndex = 0;
+
+      for (const contact of params.contacts) {
+        const device = devices[deviceIndex % devices.length];
+
+        messages.push({
+          device_id: device.id,
+          user_id: params.userId,
+          to_number: contact.phoneNumber,
+          message: params.message.replace("{{name}}", contact.name || ""),
+        });
+
+        if (params.useRoundRobin !== false) {
+          deviceIndex++;
+        }
+      }
+
+      const created = await MessageQueries.bulkCreate(messages);
+
+      for (const msg of created) {
+        await messageQueue.addMessage(msg.id, msg.device_id);
+      }
+
+      return { queued: created.length, total: params.contacts.length };
+    });
   }
 
   static async getUserStats(userId: string) {
