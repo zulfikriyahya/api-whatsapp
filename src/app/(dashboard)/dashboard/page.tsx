@@ -13,7 +13,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Fetch Real Data
     const fetchData = async () => {
       try {
         const res = await fetch("/api/stats/summary");
@@ -24,8 +23,8 @@ export default function DashboardPage() {
             active_devices: json.data.activeDevices,
             total_messages_today: json.data.todayMessages,
             success_rate: json.data.successRate,
-            total_messages_sent: 0, // Placeholder jika summary API belum lengkap
-            total_messages_failed: 0, // Placeholder
+            total_messages_sent: 0,
+            total_messages_failed: 0,
           });
         }
       } catch (e) {
@@ -36,11 +35,8 @@ export default function DashboardPage() {
     };
     fetchData();
 
-    // 2. Onboarding Tour (Only if not seen)
     const hasSeenTour = localStorage.getItem("hasSeenTour_v1");
-    // Jalankan tour hanya jika data sudah load dan di desktop
     if (!hasSeenTour && window.innerWidth > 1024) {
-      // Delay sedikit agar UI render sempurna
       setTimeout(() => {
         const driverObj = driver({
           showProgress: true,

@@ -30,13 +30,32 @@ function validateEnv(): Env {
   if (typeof window !== "undefined") return process.env as unknown as Env;
 
   const parsed = envSchema.safeParse(process.env);
+
   if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    const errorMessages = Object.entries(errors)
+      .map(([field, messages]) => `  ${field}: ${messages?.join(", ")}`)
+      .join("\n");
+
+    console.error("\n=== ENVIRONMENT VALIDATION FAILED ===");
+    console.error("Missing or invalid environment variables:\n");
+    console.error(errorMessages);
+    console.error("\n=== REQUIRED VARIABLES ===");
+    console.error("- NEXTAUTH_URL (must be valid URL)");
+    console.error("- NEXTAUTH_SECRET (min 32 characters)");
+    console.error("- GOOGLE_CLIENT_ID");
+    console.error("- GOOGLE_CLIENT_SECRET");
+    console.error("- MARIADB_HOST");
+    console.error("- MARIADB_DATABASE");
     console.error(
-      "Invalid environment variables:",
-      JSON.stringify(parsed.error.flatten().fieldErrors, null, 2),
+      "\nPlease check your .env file and ensure all required variables are set correctly.\n",
     );
-    throw new Error("Invalid environment variables");
+
+    throw new Error(
+      "Environment validation failed. Check console output above.",
+    );
   }
+
   return parsed.data;
 }
 

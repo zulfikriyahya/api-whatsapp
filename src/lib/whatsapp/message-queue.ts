@@ -25,8 +25,30 @@ class MessageQueue {
   private readonly maxRetries = parseInt(process.env.MAX_RETRY_ATTEMPTS || "3");
 
   constructor() {
+    this.loadPendingMessages();
     this.startProcessing();
     this.setupSignalHandlers();
+  }
+
+  async loadPendingMessages() {
+    try {
+      const pending: any[] = await query(
+        `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC`,
+      );
+      for (const item of pending) {
+        this.queue.push({
+          id: item.id,
+          messageId: item.message_id,
+          deviceId: item.device_id,
+          priority: item.priority,
+          scheduledAt: new Date(item.scheduled_at),
+          retries: 0,
+        });
+      }
+      console.log(`Loaded ${pending.length} pending messages into queue`);
+    } catch (error) {
+      console.error("Failed to load pending messages:", error);
+    }
   }
 
   private setupSignalHandlers() {

@@ -35,6 +35,35 @@ export class WhatsAppClientManager {
     this.setupSignalHandlers();
   }
 
+  async checkNumber(
+    deviceId: string,
+    phoneNumber: string,
+  ): Promise<{
+    registered: boolean;
+    formattedNumber?: string;
+    error?: string;
+  }> {
+    const instance = this.clients.get(deviceId);
+    if (!instance?.client) {
+      return { registered: false, error: "Device not ready" };
+    }
+
+    if (instance.status !== DeviceStatus.AUTHENTICATED) {
+      return { registered: false, error: "Device not authenticated" };
+    }
+
+    try {
+      const formatted = this.formatPhoneNumber(phoneNumber);
+      const isRegistered = await instance.client.isRegisteredUser(formatted);
+      return {
+        registered: isRegistered,
+        formattedNumber: formatted.replace("@c.us", ""),
+      };
+    } catch (error: any) {
+      console.error("Error checking number:", error);
+      return { registered: false, error: error.message };
+    }
+  }
   private ensureSessionDirectory(): void {
     if (!fs.existsSync(this.sessionPath)) {
       fs.mkdirSync(this.sessionPath, { recursive: true });

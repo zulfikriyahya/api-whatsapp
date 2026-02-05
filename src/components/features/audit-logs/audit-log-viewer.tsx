@@ -75,8 +75,7 @@ export function AuditLogViewer() {
         <div className="flex justify-end">
           <button
             onClick={() => setSelectedLog(row)}
-            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-          >
+            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
             <Eye size={16} />
           </button>
         </div>
@@ -96,15 +95,13 @@ export function AuditLogViewer() {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-          >
+            className="px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
             Previous
           </button>
           <button
             disabled={logs.length < 20}
             onClick={() => setPage((p) => p + 1)}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-          >
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
             Next
           </button>
         </div>
@@ -141,8 +138,7 @@ export function AuditLogViewer() {
                   </label>
                   <p
                     className="text-sm text-muted-foreground truncate"
-                    title={selectedLog.user_agent || ""}
-                  >
+                    title={selectedLog.user_agent || ""}>
                     {selectedLog.user_agent || "-"}
                   </p>
                 </div>
@@ -176,8 +172,7 @@ export function AuditLogViewer() {
             <div className="p-4 border-t border-border bg-muted/20 flex justify-end">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-              >
+                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
                 Close Details
               </button>
             </div>

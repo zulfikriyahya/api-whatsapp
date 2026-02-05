@@ -1,6 +1,6 @@
 # PROJECT BLUEPRINT
 
-Generated: 6/2/2026, 00.29.10
+Generated: 6/2/2026, 01.21.19
 
 ## FRONTEND
 
@@ -64,8 +64,7 @@ export default function LoginPage() {
       <button
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-6 py-4 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 dark:hover:bg-slate-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-      >
+        className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-6 py-4 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 dark:hover:bg-slate-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none">
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path
             fill="currentColor"
@@ -185,7 +184,6 @@ export default function ContactsPage() {
 ### Path: src/app/(dashboard)/dashboard/loading.tsx
 
 ```typescript
-// src/app/(dashboard)/dashboard/loading.tsx
 export default function DashboardLoading() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -224,7 +222,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Fetch Real Data
     const fetchData = async () => {
       try {
         const res = await fetch("/api/stats/summary");
@@ -235,8 +232,8 @@ export default function DashboardPage() {
             active_devices: json.data.activeDevices,
             total_messages_today: json.data.todayMessages,
             success_rate: json.data.successRate,
-            total_messages_sent: 0, // Placeholder jika summary API belum lengkap
-            total_messages_failed: 0, // Placeholder
+            total_messages_sent: 0,
+            total_messages_failed: 0,
           });
         }
       } catch (e) {
@@ -247,11 +244,8 @@ export default function DashboardPage() {
     };
     fetchData();
 
-    // 2. Onboarding Tour (Only if not seen)
     const hasSeenTour = localStorage.getItem("hasSeenTour_v1");
-    // Jalankan tour hanya jika data sudah load dan di desktop
     if (!hasSeenTour && window.innerWidth > 1024) {
-      // Delay sedikit agar UI render sempurna
       setTimeout(() => {
         const driverObj = driver({
           showProgress: true,
@@ -503,8 +497,7 @@ export default async function DeviceSettingsPage({ params }: Params) {
       <div className="flex flex-col space-y-2">
         <Link
           href="/devices"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors w-fit mb-2 group"
-        >
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors w-fit mb-2 group">
           <ChevronLeft
             size={16}
             className="mr-1 group-hover:-translate-x-1 transition-transform"
@@ -532,8 +525,7 @@ export default async function DeviceSettingsPage({ params }: Params) {
               device.status === "AUTHENTICATED"
                 ? "bg-green-500/10 text-green-600 border-green-500/20"
                 : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
-            }`}
-          >
+            }`}>
             {device.status}
           </div>
         </div>
@@ -558,7 +550,6 @@ export default async function DeviceSettingsPage({ params }: Params) {
 "use client";
 
 import { useState } from "react";
-// PENTING: Pastikan path ini benar dan tidak melalui index.ts yang circular
 import { DeviceList } from "@/components/features/devices/device-list";
 import { AddDeviceModal } from "@/components/features/devices/add-device-modal";
 import { Plus } from "lucide-react";
@@ -1554,8 +1545,7 @@ export function UserManagement() {
             user.role === "ADMIN"
               ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
               : "bg-blue-500/10 text-blue-600 border-blue-500/20",
-          )}
-        >
+          )}>
           <Shield size={12} /> {user.role}
         </span>
       ),
@@ -1569,8 +1559,7 @@ export function UserManagement() {
             user.is_active
               ? "bg-green-500/10 text-green-600 border-green-500/20"
               : "bg-red-500/10 text-red-600 border-red-500/20",
-          )}
-        >
+          )}>
           {user.is_active ? "Active" : "Inactive"}
         </span>
       ),
@@ -1595,8 +1584,7 @@ export function UserManagement() {
               user.is_active
                 ? "bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20"
                 : "bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20",
-            )}
-          >
+            )}>
             {user.is_active ? (
               <>
                 <Ban size={14} /> Deactivate
@@ -1707,8 +1695,7 @@ export function AuditLogViewer() {
         <div className="flex justify-end">
           <button
             onClick={() => setSelectedLog(row)}
-            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-          >
+            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
             <Eye size={16} />
           </button>
         </div>
@@ -1728,15 +1715,13 @@ export function AuditLogViewer() {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-          >
+            className="px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
             Previous
           </button>
           <button
             disabled={logs.length < 20}
             onClick={() => setPage((p) => p + 1)}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-          >
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
             Next
           </button>
         </div>
@@ -1773,8 +1758,7 @@ export function AuditLogViewer() {
                   </label>
                   <p
                     className="text-sm text-muted-foreground truncate"
-                    title={selectedLog.user_agent || ""}
-                  >
+                    title={selectedLog.user_agent || ""}>
                     {selectedLog.user_agent || "-"}
                   </p>
                 </div>
@@ -1808,8 +1792,7 @@ export function AuditLogViewer() {
             <div className="p-4 border-t border-border bg-muted/20 flex justify-end">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-              >
+                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
                 Close Details
               </button>
             </div>
@@ -1927,8 +1910,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
         </div>
         <button
           onClick={() => openModal()}
-          className="flex items-center gap-2 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 hover:-translate-y-0.5"
-        >
+          className="flex items-center gap-2 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 hover:-translate-y-0.5">
           <Plus size={16} /> Add Rule
         </button>
       </div>
@@ -1945,8 +1927,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
         {rules.map((rule) => (
           <div
             key={rule.id}
-            className="glass-card p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start gap-4 group hover:border-primary/30 transition-all"
-          >
+            className="glass-card p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start gap-4 group hover:border-primary/30 transition-all">
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-mono text-sm font-bold bg-muted px-3 py-1 rounded-lg border border-border text-foreground">
@@ -1958,8 +1939,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
                     rule.is_active
                       ? "bg-green-500/10 text-green-600 border-green-500/20"
                       : "bg-gray-500/10 text-gray-500 border-gray-500/20",
-                  )}
-                >
+                  )}>
                   {rule.is_active ? "Active" : "Inactive"}
                 </span>
                 <span className="text-xs text-muted-foreground flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md">
@@ -1974,14 +1954,12 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
             <div className="flex gap-2 self-start sm:self-center opacity-80 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => openModal(rule)}
-                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-              >
+                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
                 <Edit2 size={18} />
               </button>
               <button
                 onClick={() => handleDelete(rule.id)}
-                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              >
+                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
                 <Trash2 size={18} />
               </button>
             </div>
@@ -2051,8 +2029,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
                       className={cn(
                         "w-12 h-6 rounded-full p-1 transition-colors duration-200 flex items-center",
                         formData.isActive ? "bg-primary" : "bg-muted",
-                      )}
-                    >
+                      )}>
                       <div
                         className={cn(
                           "w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200",
@@ -2078,14 +2055,12 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2.5 rounded-xl text-muted-foreground font-medium hover:bg-muted transition-colors"
-                >
+                  className="px-4 py-2.5 rounded-xl text-muted-foreground font-medium hover:bg-muted transition-colors">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all"
-                >
+                  className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all">
                   Save Rule
                 </button>
               </div>
@@ -2742,11 +2717,9 @@ export function StatsCards({ stats }: { stats: DashboardStats }) {
       {cards.map((card, index) => (
         <div
           key={index}
-          className="glass-card rounded-2xl p-6 relative overflow-hidden group hover:shadow-xl transition-all duration-300"
-        >
+          className="glass-card rounded-2xl p-6 relative overflow-hidden group hover:shadow-xl transition-all duration-300">
           <div
-            className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${card.gradient} rounded-bl-3xl w-24 h-24 flex items-start justify-end`}
-          >
+            className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${card.gradient} rounded-bl-3xl w-24 h-24 flex items-start justify-end`}>
             <card.icon className="h-10 w-10 text-white" />
           </div>
 
@@ -3357,8 +3330,7 @@ export function BulkSender() {
                     selectedTags.includes(tag)
                       ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
                       : "bg-background border-input text-muted-foreground hover:bg-muted hover:border-border",
-                  )}
-                >
+                  )}>
                   {tag}
                 </button>
               ))}
@@ -3391,8 +3363,7 @@ export function BulkSender() {
             </label>
             <select
               className="w-full rounded-xl bg-muted/50 border border-input px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-              onChange={handleTemplateSelect}
-            >
+              onChange={handleTemplateSelect}>
               <option value="">-- Select Template --</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -3413,8 +3384,7 @@ export function BulkSender() {
               <span
                 key={v}
                 className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground font-mono cursor-pointer hover:text-foreground transition-colors"
-                onClick={() => setMessage((prev) => prev + v)}
-              >
+                onClick={() => setMessage((prev) => prev + v)}>
                 {v}
               </span>
             ))}
@@ -3436,8 +3406,7 @@ export function BulkSender() {
             <select
               className="w-full rounded-xl bg-muted/50 border border-input px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
               value={selectedDevice}
-              onChange={(e) => setSelectedDevice(e.target.value)}
-            >
+              onChange={(e) => setSelectedDevice(e.target.value)}>
               <option value="">-- Select Active Device --</option>
               {devices.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -3459,8 +3428,7 @@ export function BulkSender() {
                 status.type === "success"
                   ? "bg-green-500/10 text-green-600 border-green-500/20"
                   : "bg-red-500/10 text-red-600 border-red-500/20",
-              )}
-            >
+              )}>
               {status.text}
             </div>
           )}
@@ -3474,8 +3442,7 @@ export function BulkSender() {
                 !selectedDevice ||
                 !message
               }
-              className="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex justify-center items-center gap-3"
-            >
+              className="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex justify-center items-center gap-3">
               {loading ? (
                 <Loader2 className="animate-spin" />
               ) : (
@@ -5975,7 +5942,11 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { messageQueue } from "@/lib/whatsapp/message-queue";
 
+if (typeof window === "undefined") {
+  messageQueue.loadPendingMessages().catch(console.error);
+}
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -5991,8 +5962,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.className} min-h-screen bg-background selection:bg-primary selection:text-primary-foreground`}
-      >
+        className={`${inter.className} min-h-screen bg-background selection:bg-primary selection:text-primary-foreground`}>
         <Providers>{children}</Providers>
       </body>
     </html>
@@ -7338,6 +7308,60 @@ export async function POST(_request: NextRequest) {
       ]);
     }
 
+    const rateLimitCheck = await RateLimiter.checkLimit(body.deviceId);
+    if (!rateLimitCheck.allowed) {
+      return validationErrorResponse([
+        {
+          field: "rateLimit",
+          message: rateLimitCheck.reason || "Rate limit exceeded",
+        },
+      ]);
+    }
+
+    const message = await MessageService.sendMessage({
+      device_id: body.deviceId,
+      user_id: apiKeyRecord.user_id,
+      to_number: body.toNumber,
+      message: body.message,
+    });
+
+    return successResponse({
+      messageId: message.id,
+      status: message.status,
+      queuedAt: message.created_at,
+    });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function POST(_request: NextRequest) {
+  try {
+    const apiKey = _request.headers.get("x-api-key");
+
+    if (!apiKey) {
+      return unauthorizedResponse("API key is required");
+    }
+
+    const keyHash = ApiKeyQueries.hashApiKey(apiKey);
+    const apiKeyRecord = await ApiKeyQueries.findByHash(keyHash);
+
+    if (!apiKeyRecord || !apiKeyRecord.is_active) {
+      return unauthorizedResponse("Invalid or inactive API key");
+    }
+
+    await ApiKeyQueries.updateLastUsed(apiKeyRecord.id);
+
+    const body = await _request.json();
+
+    if (!body.deviceId || !body.toNumber || !body.message) {
+      return validationErrorResponse([
+        { field: "deviceId", message: "Device ID is required" },
+        { field: "toNumber", message: "Phone number is required" },
+        { field: "message", message: "Message is required" },
+      ]);
+    }
+
     const message = await MessageService.sendMessage({
       device_id: body.deviceId,
       user_id: apiKeyRecord.user_id,
@@ -7992,6 +8016,7 @@ export async function GET(_request: NextRequest) {
 ### Path: src/app/api/inbox/conversations/route.ts
 
 ```typescript
+// src/app/api/inbox/conversations/route.ts
 import { NextRequest } from "next/server";
 import { query } from "@/lib/db";
 import { getServerSession } from "next-auth";
@@ -8007,7 +8032,6 @@ export async function GET(_request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return unauthorizedResponse();
 
-    // PERBAIKAN: Menambahkan 'messages.' di depan kolom yang ambigu (id, direction, dll)
     const sql = `
       SELECT 
         t1.remote_number,
@@ -8021,7 +8045,7 @@ export async function GET(_request: NextRequest) {
             WHEN messages.direction = 'INBOUND' THEN messages.from_number 
             ELSE messages.to_number 
           END as remote_number,
-          MAX(messages.id) as last_message_id, -- Fixed ambiguous column
+          MAX(messages.id) as last_message_id,
           MAX(CASE WHEN messages.direction = 'INBOUND' THEN messages.from_number ELSE messages.to_number END) as display_name
         FROM messages 
         JOIN devices d ON messages.device_id = d.id
@@ -8044,7 +8068,7 @@ export async function GET(_request: NextRequest) {
         minute: "2-digit",
       }),
       isGroup: row.remote_number.endsWith("@g.us"),
-      unreadCount: 0, // Placeholder
+      unreadCount: 0,
     }));
 
     return successResponse(conversations);
@@ -8240,6 +8264,7 @@ import { MessageService } from "@/lib/services/message.service";
 import { StorageService } from "@/lib/services/storage.service";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
+import { RateLimiter } from "@/lib/utils/rate-limiter";
 import {
   successResponse,
   handleApiError,
@@ -8272,7 +8297,18 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     }
 
-    // Bulk Send Logic
+    if (!body.contacts && body.deviceId) {
+      const rateLimitCheck = await RateLimiter.checkLimit(body.deviceId);
+      if (!rateLimitCheck.allowed) {
+        return validationErrorResponse([
+          {
+            field: "rateLimit",
+            message: rateLimitCheck.reason || "Rate limit exceeded",
+          },
+        ]);
+      }
+    }
+
     if (body.contacts && Array.isArray(body.contacts)) {
       const result = await MessageService.sendBulkMessages({
         userId: session.user.id,
@@ -8284,7 +8320,6 @@ export async function POST(req: NextRequest) {
       return successResponse(result, { status: 201 });
     }
 
-    // Single Message Logic
     if (!body.deviceId && !body.useRoundRobin) {
       const devices = await DeviceQueries.getActiveDevices();
       const userDevices = devices.filter((d) => d.user_id === session.user.id);
@@ -8316,7 +8351,6 @@ export async function POST(req: NextRequest) {
       to_number: body.toNumber?.replace(/\D/g, "") || "",
       message: body.message || "",
       media_path: mediaPath,
-      // @ts-ignore
       media_type: mediaType,
     });
 
@@ -8325,6 +8359,84 @@ export async function POST(req: NextRequest) {
     return handleApiError(error);
   }
 }
+
+// export async function POST(req: NextRequest) {
+//   try {
+//     const session = await getServerSession(authOptions);
+//     if (!session?.user) return unauthorizedResponse();
+
+//     let body: any = {};
+//     const contentType = req.headers.get("content-type") || "";
+
+//     if (contentType.includes("multipart/form-data")) {
+//       const formData = await req.formData();
+//       body = {
+//         deviceId: formData.get("deviceId") as string,
+//         toNumber: formData.get("toNumber") as string,
+//         message: formData.get("message") as string,
+//         media: formData.get("media") as File | null,
+//         useRoundRobin: formData.get("useRoundRobin") === "true",
+//         contacts: formData.get("contacts")
+//           ? JSON.parse(formData.get("contacts") as string)
+//           : undefined,
+//       };
+//     } else {
+//       body = await req.json();
+//     }
+
+//     // Bulk Send Logic
+//     if (body.contacts && Array.isArray(body.contacts)) {
+//       const result = await MessageService.sendBulkMessages({
+//         userId: session.user.id,
+//         contacts: body.contacts,
+//         message: body.message,
+//         deviceIds: body.deviceId ? [body.deviceId] : undefined,
+//         useRoundRobin: body.useRoundRobin || false,
+//       });
+//       return successResponse(result, { status: 201 });
+//     }
+
+//     // Single Message Logic
+//     if (!body.deviceId && !body.useRoundRobin) {
+//       const devices = await DeviceQueries.getActiveDevices();
+//       const userDevices = devices.filter((d) => d.user_id === session.user.id);
+//       if (userDevices.length > 0) {
+//         body.deviceId = userDevices[0].id;
+//       } else {
+//         return validationErrorResponse([
+//           { field: "deviceId", message: "No active device found" },
+//         ]);
+//       }
+//     }
+
+//     let mediaPath = undefined;
+//     let mediaType = undefined;
+
+//     if (body.media && body.media.size > 0) {
+//       if (body.media.type.startsWith("image/")) mediaType = "image";
+//       else if (body.media.type.startsWith("video/")) mediaType = "video";
+//       else if (body.media.type.startsWith("audio/")) mediaType = "audio";
+//       else mediaType = "document";
+
+//       const saved = await StorageService.saveFile(body.media, "messages");
+//       mediaPath = saved.path;
+//     }
+
+//     const result = await MessageService.sendMessage({
+//       user_id: session.user.id,
+//       device_id: body.deviceId,
+//       to_number: body.toNumber?.replace(/\D/g, "") || "",
+//       message: body.message || "",
+//       media_path: mediaPath,
+//       // @ts-ignore
+//       media_type: mediaType,
+//     });
+
+//     return successResponse(result, { status: 201 });
+//   } catch (error) {
+//     return handleApiError(error);
+//   }
+// }
 ```
 
 ### Path: src/app/api/reports/export/route.ts
@@ -9424,6 +9536,135 @@ export const closeDatabase = (): Promise<void> => db.close();
 export const healthCheck = (): Promise<boolean> => db.healthCheck();
 
 export default db;
+```
+
+### Path: src/lib/db/migrations/index.ts
+
+```typescript
+// src/lib/db/migrations/index.ts
+
+import * as fs from "fs";
+import * as path from "path";
+import { query, queryOne } from "../index";
+
+interface Migration {
+  id: number;
+  name: string;
+  executed_at: Date;
+}
+
+export class MigrationRunner {
+  private migrationsPath: string;
+
+  constructor() {
+    this.migrationsPath = path.join(process.cwd(), "database", "migrations");
+    this.ensureMigrationsTable();
+  }
+
+  private async ensureMigrationsTable(): Promise<void> {
+    await query(`
+      CREATE TABLE IF NOT EXISTS migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  }
+
+  async getExecutedMigrations(): Promise<Migration[]> {
+    return query<Migration[]>("SELECT * FROM migrations ORDER BY id ASC");
+  }
+
+  async getMigrationFiles(): Promise<string[]> {
+    if (!fs.existsSync(this.migrationsPath)) {
+      fs.mkdirSync(this.migrationsPath, { recursive: true });
+      return [];
+    }
+
+    const files = fs
+      .readdirSync(this.migrationsPath)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+
+    return files;
+  }
+
+  async run(): Promise<void> {
+    const executedMigrations = await this.getExecutedMigrations();
+    const executedNames = new Set(executedMigrations.map((m) => m.name));
+
+    const migrationFiles = await this.getMigrationFiles();
+    const pendingMigrations = migrationFiles.filter(
+      (f) => !executedNames.has(f),
+    );
+
+    if (pendingMigrations.length === 0) {
+      console.log("No pending migrations");
+      return;
+    }
+
+    console.log(`Running ${pendingMigrations.length} migrations...`);
+
+    for (const migrationFile of pendingMigrations) {
+      const filePath = path.join(this.migrationsPath, migrationFile);
+      const sql = fs.readFileSync(filePath, "utf-8");
+
+      console.log(`Executing migration: ${migrationFile}`);
+
+      const statements = sql
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+      for (const statement of statements) {
+        await query(statement);
+      }
+
+      await query("INSERT INTO migrations (name) VALUES (?)", [migrationFile]);
+
+      console.log(`Completed migration: ${migrationFile}`);
+    }
+
+    console.log("All migrations completed successfully");
+  }
+
+  async rollback(): Promise<void> {
+    const executedMigrations = await this.getExecutedMigrations();
+
+    if (executedMigrations.length === 0) {
+      console.log("No migrations to rollback");
+      return;
+    }
+
+    const lastMigration = executedMigrations[executedMigrations.length - 1];
+    console.log(`Rolling back migration: ${lastMigration.name}`);
+
+    await query("DELETE FROM migrations WHERE id = ?", [lastMigration.id]);
+
+    console.log(`Rollback completed: ${lastMigration.name}`);
+  }
+
+  async create(name: string): Promise<void> {
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .split("T")[0];
+    const filename = `${timestamp}_${name}.sql`;
+    const filepath = path.join(this.migrationsPath, filename);
+
+    const template = `-- Migration: ${name}
+-- Created: ${new Date().toISOString()}
+
+-- Add your SQL statements here
+
+`;
+
+    fs.writeFileSync(filepath, template);
+    console.log(`Created migration file: ${filename}`);
+  }
+}
+
+export const migrationRunner = new MigrationRunner();
 ```
 
 ### Path: src/lib/db/queries/api-key.queries.ts
@@ -11795,6 +12036,35 @@ export class WhatsAppClientManager {
     this.setupSignalHandlers();
   }
 
+  async checkNumber(
+    deviceId: string,
+    phoneNumber: string,
+  ): Promise<{
+    registered: boolean;
+    formattedNumber?: string;
+    error?: string;
+  }> {
+    const instance = this.clients.get(deviceId);
+    if (!instance?.client) {
+      return { registered: false, error: "Device not ready" };
+    }
+
+    if (instance.status !== DeviceStatus.AUTHENTICATED) {
+      return { registered: false, error: "Device not authenticated" };
+    }
+
+    try {
+      const formatted = this.formatPhoneNumber(phoneNumber);
+      const isRegistered = await instance.client.isRegisteredUser(formatted);
+      return {
+        registered: isRegistered,
+        formattedNumber: formatted.replace("@c.us", ""),
+      };
+    } catch (error: any) {
+      console.error("Error checking number:", error);
+      return { registered: false, error: error.message };
+    }
+  }
   private ensureSessionDirectory(): void {
     if (!fs.existsSync(this.sessionPath)) {
       fs.mkdirSync(this.sessionPath, { recursive: true });
@@ -12291,8 +12561,30 @@ class MessageQueue {
   private readonly maxRetries = parseInt(process.env.MAX_RETRY_ATTEMPTS || "3");
 
   constructor() {
+    this.loadPendingMessages();
     this.startProcessing();
     this.setupSignalHandlers();
+  }
+
+  async loadPendingMessages() {
+    try {
+      const pending: any[] = await query(
+        `SELECT * FROM message_queue WHERE status = 'PENDING' ORDER BY priority DESC, scheduled_at ASC`,
+      );
+      for (const item of pending) {
+        this.queue.push({
+          id: item.id,
+          messageId: item.message_id,
+          deviceId: item.device_id,
+          priority: item.priority,
+          scheduledAt: new Date(item.scheduled_at),
+          retries: 0,
+        });
+      }
+      console.log(`Loaded ${pending.length} pending messages into queue`);
+    } catch (error) {
+      console.error("Failed to load pending messages:", error);
+    }
   }
 
   private setupSignalHandlers() {
@@ -12667,13 +12959,32 @@ function validateEnv(): Env {
   if (typeof window !== "undefined") return process.env as unknown as Env;
 
   const parsed = envSchema.safeParse(process.env);
+
   if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    const errorMessages = Object.entries(errors)
+      .map(([field, messages]) => `  ${field}: ${messages?.join(", ")}`)
+      .join("\n");
+
+    console.error("\n=== ENVIRONMENT VALIDATION FAILED ===");
+    console.error("Missing or invalid environment variables:\n");
+    console.error(errorMessages);
+    console.error("\n=== REQUIRED VARIABLES ===");
+    console.error("- NEXTAUTH_URL (must be valid URL)");
+    console.error("- NEXTAUTH_SECRET (min 32 characters)");
+    console.error("- GOOGLE_CLIENT_ID");
+    console.error("- GOOGLE_CLIENT_SECRET");
+    console.error("- MARIADB_HOST");
+    console.error("- MARIADB_DATABASE");
     console.error(
-      "Invalid environment variables:",
-      JSON.stringify(parsed.error.flatten().fieldErrors, null, 2),
+      "\nPlease check your .env file and ensure all required variables are set correctly.\n",
     );
-    throw new Error("Invalid environment variables");
+
+    throw new Error(
+      "Environment validation failed. Check console output above.",
+    );
   }
+
   return parsed.data;
 }
 

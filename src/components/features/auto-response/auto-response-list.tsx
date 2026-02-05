@@ -100,8 +100,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
         </div>
         <button
           onClick={() => openModal()}
-          className="flex items-center gap-2 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 hover:-translate-y-0.5"
-        >
+          className="flex items-center gap-2 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 hover:-translate-y-0.5">
           <Plus size={16} /> Add Rule
         </button>
       </div>
@@ -118,8 +117,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
         {rules.map((rule) => (
           <div
             key={rule.id}
-            className="glass-card p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start gap-4 group hover:border-primary/30 transition-all"
-          >
+            className="glass-card p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start gap-4 group hover:border-primary/30 transition-all">
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-mono text-sm font-bold bg-muted px-3 py-1 rounded-lg border border-border text-foreground">
@@ -131,8 +129,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
                     rule.is_active
                       ? "bg-green-500/10 text-green-600 border-green-500/20"
                       : "bg-gray-500/10 text-gray-500 border-gray-500/20",
-                  )}
-                >
+                  )}>
                   {rule.is_active ? "Active" : "Inactive"}
                 </span>
                 <span className="text-xs text-muted-foreground flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md">
@@ -147,14 +144,12 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
             <div className="flex gap-2 self-start sm:self-center opacity-80 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => openModal(rule)}
-                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-              >
+                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
                 <Edit2 size={18} />
               </button>
               <button
                 onClick={() => handleDelete(rule.id)}
-                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              >
+                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
                 <Trash2 size={18} />
               </button>
             </div>
@@ -224,8 +219,7 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
                       className={cn(
                         "w-12 h-6 rounded-full p-1 transition-colors duration-200 flex items-center",
                         formData.isActive ? "bg-primary" : "bg-muted",
-                      )}
-                    >
+                      )}>
                       <div
                         className={cn(
                           "w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200",
@@ -251,14 +245,12 @@ export function AutoResponseList({ deviceId }: AutoResponseListProps) {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2.5 rounded-xl text-muted-foreground font-medium hover:bg-muted transition-colors"
-                >
+                  className="px-4 py-2.5 rounded-xl text-muted-foreground font-medium hover:bg-muted transition-colors">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all"
-                >
+                  className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all">
                   Save Rule
                 </button>
               </div>

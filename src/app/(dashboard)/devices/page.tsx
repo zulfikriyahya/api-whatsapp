@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-// PENTING: Pastikan path ini benar dan tidak melalui index.ts yang circular
 import { DeviceList } from "@/components/features/devices/device-list";
 import { AddDeviceModal } from "@/components/features/devices/add-device-modal";
 import { Plus } from "lucide-react";

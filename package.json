@@ -6,6 +6,10 @@
   "author": "Yahya Zulfikri",
   "license": "MIT",
   "scripts": {
+    "migrate": "tsx scripts/migrate.ts",
+    "migrate:up": "tsx scripts/migrate.ts up",
+    "migrate:down": "tsx scripts/migrate.ts down",
+    "migrate:create": "tsx scripts/migrate.ts create",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -117,8 +117,7 @@ export function BulkSender() {
                     selectedTags.includes(tag)
                       ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
                       : "bg-background border-input text-muted-foreground hover:bg-muted hover:border-border",
-                  )}
-                >
+                  )}>
                   {tag}
                 </button>
               ))}
@@ -151,8 +150,7 @@ export function BulkSender() {
             </label>
             <select
               className="w-full rounded-xl bg-muted/50 border border-input px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-              onChange={handleTemplateSelect}
-            >
+              onChange={handleTemplateSelect}>
               <option value="">-- Select Template --</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -173,8 +171,7 @@ export function BulkSender() {
               <span
                 key={v}
                 className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground font-mono cursor-pointer hover:text-foreground transition-colors"
-                onClick={() => setMessage((prev) => prev + v)}
-              >
+                onClick={() => setMessage((prev) => prev + v)}>
                 {v}
               </span>
             ))}
@@ -196,8 +193,7 @@ export function BulkSender() {
             <select
               className="w-full rounded-xl bg-muted/50 border border-input px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
               value={selectedDevice}
-              onChange={(e) => setSelectedDevice(e.target.value)}
-            >
+              onChange={(e) => setSelectedDevice(e.target.value)}>
               <option value="">-- Select Active Device --</option>
               {devices.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -219,8 +215,7 @@ export function BulkSender() {
                 status.type === "success"
                   ? "bg-green-500/10 text-green-600 border-green-500/20"
                   : "bg-red-500/10 text-red-600 border-red-500/20",
-              )}
-            >
+              )}>
               {status.text}
             </div>
           )}
@@ -234,8 +229,7 @@ export function BulkSender() {
                 !selectedDevice ||
                 !message
               }
-              className="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex justify-center items-center gap-3"
-            >
+              className="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none flex justify-center items-center gap-3">
               {loading ? (
                 <Loader2 className="animate-spin" />
               ) : (

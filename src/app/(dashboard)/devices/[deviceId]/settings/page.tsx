@@ -27,8 +27,7 @@ export default async function DeviceSettingsPage({ params }: Params) {
       <div className="flex flex-col space-y-2">
         <Link
           href="/devices"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors w-fit mb-2 group"
-        >
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors w-fit mb-2 group">
           <ChevronLeft
             size={16}
             className="mr-1 group-hover:-translate-x-1 transition-transform"
@@ -56,8 +55,7 @@ export default async function DeviceSettingsPage({ params }: Params) {
               device.status === "AUTHENTICATED"
                 ? "bg-green-500/10 text-green-600 border-green-500/20"
                 : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
-            }`}
-          >
+            }`}>
             {device.status}
           </div>
         </div>

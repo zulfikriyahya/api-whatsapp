@@ -1,3 +1,4 @@
+// src/app/api/inbox/conversations/route.ts
 import { NextRequest } from "next/server";
 import { query } from "@/lib/db";
 import { getServerSession } from "next-auth";
@@ -13,7 +14,6 @@ export async function GET(_request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return unauthorizedResponse();
 
-    // PERBAIKAN: Menambahkan 'messages.' di depan kolom yang ambigu (id, direction, dll)
     const sql = `
       SELECT 
         t1.remote_number,
@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
             WHEN messages.direction = 'INBOUND' THEN messages.from_number 
             ELSE messages.to_number 
           END as remote_number,
-          MAX(messages.id) as last_message_id, -- Fixed ambiguous column
+          MAX(messages.id) as last_message_id,
           MAX(CASE WHEN messages.direction = 'INBOUND' THEN messages.from_number ELSE messages.to_number END) as display_name
         FROM messages 
         JOIN devices d ON messages.device_id = d.id
@@ -50,7 +50,7 @@ export async function GET(_request: NextRequest) {
         minute: "2-digit",
       }),
       isGroup: row.remote_number.endsWith("@g.us"),
-      unreadCount: 0, // Placeholder
+      unreadCount: 0,
     }));
 
     return successResponse(conversations);

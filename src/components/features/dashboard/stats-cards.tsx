@@ -48,11 +48,9 @@ export function StatsCards({ stats }: { stats: DashboardStats }) {
       {cards.map((card, index) => (
         <div
           key={index}
-          className="glass-card rounded-2xl p-6 relative overflow-hidden group hover:shadow-xl transition-all duration-300"
-        >
+          className="glass-card rounded-2xl p-6 relative overflow-hidden group hover:shadow-xl transition-all duration-300">
           <div
-            className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${card.gradient} rounded-bl-3xl w-24 h-24 flex items-start justify-end`}
-          >
+            className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${card.gradient} rounded-bl-3xl w-24 h-24 flex items-start justify-end`}>
             <card.icon className="h-10 w-10 text-white" />
           </div>
 
