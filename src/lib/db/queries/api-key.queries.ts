@@ -4,6 +4,10 @@ import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
 
 export class ApiKeyQueries {
+  private static readonly KEY_PREFIX = "wwa";
+  private static readonly KEY_LENGTH = 48;
+  private static readonly HASH_ALGORITHM = "sha256";
+
   static async findById(id: string): Promise<ApiKey | null> {
     return queryOne<ApiKey>("SELECT * FROM api_keys WHERE id = ?", [id]);
   }
@@ -59,10 +63,20 @@ export class ApiKeyQueries {
   }
 
   static generateApiKey(): string {
-    return `wwa_${crypto.randomBytes(32).toString("hex")}`;
+    const randomBytes = crypto.randomBytes(this.KEY_LENGTH);
+    const key = randomBytes.toString("base64url");
+    return `${this.KEY_PREFIX}_${key}`;
   }
 
   static hashApiKey(apiKey: string): string {
-    return crypto.createHash("sha256").update(apiKey).digest("hex");
+    return crypto.createHash(this.HASH_ALGORITHM).update(apiKey).digest("hex");
+  }
+
+  static verifyApiKey(plainKey: string, storedHash: string): boolean {
+    const computedHash = this.hashApiKey(plainKey);
+    return crypto.timingSafeEqual(
+      Buffer.from(computedHash),
+      Buffer.from(storedHash),
+    );
   }
 }
