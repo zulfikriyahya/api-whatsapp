@@ -55,7 +55,7 @@
     "ioredis": "^5.9.2",
     "lucide-react": "^0.468.0",
     "mysql2": "^3.11.5",
-    "next": "15.1.6",
+    "next": "15.5.10",
     "next-auth": "^4.24.5",
     "next-themes": "^0.2.1",
     "nodemailer": "^8.0.0",
