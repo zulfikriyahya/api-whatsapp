@@ -69,7 +69,7 @@
     "speakeasy": "^2.0.0",
     "tailwind-merge": "^2.5.5",
     "ts-jest": "^29.4.6",
-    "uuid": "^10.0.0",
+    "uuid": "^14.0.0",
     "vcf": "^2.1.1",
     "whatsapp-web.js": "^1.26.0",
     "winston": "^3.13.0",
